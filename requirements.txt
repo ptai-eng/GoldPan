@@ -1,0 +1,9 @@
+markitdown
+beautifulsoup4
+requests
+playwright
+trafilatura
+pydantic
+gradio
+python-dotenv
+pytest
