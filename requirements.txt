@@ -4,6 +4,8 @@ requests
 playwright
 trafilatura
 pydantic
-gradio
 python-dotenv
 pytest
+fastapi
+uvicorn
+python-multipart

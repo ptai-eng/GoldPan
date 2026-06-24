@@ -1,13 +1,39 @@
 import requests
 import trafilatura
 from bs4 import BeautifulSoup
+import re
 from goldpan.core.schemas import RawContent, DocumentInfo
 
 class HybridWebExtractor:
     def __init__(self, use_playwright_fallback: bool = True):
         self.use_playwright_fallback = use_playwright_fallback
 
+    def _extract_youtube_id(self, url: str) -> str:
+        match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)
+        return match.group(1) if match else None
+
+    def _extract_youtube(self, url: str, video_id: str) -> RawContent:
+        try:
+            from youtube_transcript_api import YouTubeTranscriptApi
+            ytt_api = YouTubeTranscriptApi()
+            transcript_list = ytt_api.list(video_id)
+            transcript = transcript_list.find_transcript(['en', 'vi'])
+            data = transcript.fetch()
+            text = "\n".join([getattr(t, 'text', str(t)) for t in data])
+            doc_info = DocumentInfo(source_url=url, title=f"YouTube Video - {video_id}")
+            return RawContent(text=text, doc_info=doc_info, original_format="youtube")
+        except Exception as e:
+            raise ValueError(f"Could not extract YouTube transcript: {str(e)}")
+
     def extract(self, url: str) -> RawContent:
+        yt_id = self._extract_youtube_id(url)
+        if yt_id and "youtube.com" in url or "youtu.be" in url:
+            return self._extract_youtube(url, yt_id)
+
+        # Basic Github blob to raw conversion
+        if "github.com" in url and "/blob/" in url:
+            url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+
         # Step 1: Try fast requests
         try:
             response = requests.get(url, timeout=10)
