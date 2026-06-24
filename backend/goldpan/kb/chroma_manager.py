@@ -1,19 +1,30 @@
 import os
 import uuid
 import chromadb
-from chromadb.utils import embedding_functions
+from google import genai
 
 class ChromaManager:
     def __init__(self, persist_directory: str = "chroma_data"):
         self.persist_directory = persist_directory
         self.client = chromadb.PersistentClient(path=self.persist_directory)
         
-        # Use default local embedding function (all-MiniLM-L6-v2) for 100% free offline usage
-        self.embedding_fn = embedding_functions.DefaultEmbeddingFunction()
-        self.collection = self.client.get_or_create_collection(
-            name="goldpan_kb",
-            embedding_function=self.embedding_fn
+        # Không dùng default embedding function nữa, ta tự nhúng bằng Gemini
+        self.collection = self.client.get_or_create_collection(name="goldpan_kb")
+        self.api_key = None
+        
+    def set_api_key(self, api_key: str):
+        self.api_key = api_key
+        
+    def _get_embeddings(self, texts: list[str]) -> list[list[float]]:
+        if not self.api_key:
+            raise ValueError("Gemini API Key is required for Knowledge Base operations.")
+        client = genai.Client(api_key=self.api_key)
+        # Gemini embedding API expects a list of strings
+        response = client.models.embed_content(
+            model='models/text-embedding-004',
+            contents=texts
         )
+        return [e.values for e in response.embeddings]
 
     def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
         chunks = []
@@ -36,16 +47,22 @@ class ChromaManager:
         ids = [f"{document_id}_chunk_{i}" for i in range(len(chunks))]
         metadatas = [metadata or {} for _ in chunks]
         
+        # Tự lấy embeddings từ Gemini
+        embeddings = self._get_embeddings(chunks)
+        
         self.collection.upsert(
             documents=chunks,
             ids=ids,
-            metadatas=metadatas
+            metadatas=metadatas,
+            embeddings=embeddings
         )
 
     def search(self, query: str, n_results: int = 3) -> list[str]:
         """Tìm kiếm các chunk liên quan nhất đến câu hỏi."""
+        query_embeddings = self._get_embeddings([query])
+        
         results = self.collection.query(
-            query_texts=[query],
+            query_embeddings=query_embeddings,
             n_results=n_results
         )
         if not results['documents'] or not results['documents'][0]:
@@ -53,10 +70,9 @@ class ChromaManager:
         return results['documents'][0]
         
     def get_all_documents(self):
-        """Lấy danh sách các tài liệu đã lưu (dựa trên metadata)."""
+        """Lấy danh sách các tài liệu đã lưu."""
         results = self.collection.get(include=['metadatas'])
         
-        # Lọc để lấy danh sách document unique (mỗi chunk chung document_id)
         docs = {}
         for meta in results['metadatas']:
             if meta and 'document_id' in meta:
@@ -70,5 +86,4 @@ class ChromaManager:
         return list(docs.values())
         
     def delete_document(self, document_id: str):
-        """Xóa toàn bộ chunk của một tài liệu."""
         self.collection.delete(where={"document_id": document_id})

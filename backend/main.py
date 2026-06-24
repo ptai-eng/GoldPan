@@ -65,8 +65,12 @@ class ChatRequest(BaseModel):
     history: list = []
 
 @app.post("/api/kb/ingest")
-async def ingest_document(req: IngestRequest):
+async def ingest_document(req: IngestRequest, x_gemini_api_key: Optional[str] = Header(None)):
+    if not x_gemini_api_key:
+        raise HTTPException(status_code=400, detail="Missing API Key for Ingest. Please configure it in Settings.")
+    
     try:
+        chroma_manager.set_api_key(x_gemini_api_key)
         doc_id = str(uuid.uuid4())
         # Attach doc_id to metadata so we can retrieve it
         req.metadata['document_id'] = doc_id
@@ -89,6 +93,7 @@ async def chat_with_kb(req: ChatRequest, x_gemini_api_key: Optional[str] = Heade
         raise HTTPException(status_code=400, detail="Missing API Key for Chat. Please configure it in Settings.")
         
     try:
+        chroma_manager.set_api_key(x_gemini_api_key)
         # 1. Semantic Search in ChromaDB
         relevant_chunks = chroma_manager.search(req.message, n_results=3)
         context = "\n\n---\n\n".join(relevant_chunks)

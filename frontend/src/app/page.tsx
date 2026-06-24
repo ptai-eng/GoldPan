@@ -162,12 +162,18 @@ export default function Home() {
     if (!result) return;
     setIsSavingKb(true);
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (apiKey) headers["X-Gemini-Api-Key"] = apiKey;
+      
       const res = await fetch("http://localhost:8000/api/kb/ingest", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ markdown: result.markdown, metadata: result.metadata }),
       });
-      if (!res.ok) throw new Error("Failed to save to KB");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.detail || "Failed to save to KB");
+      }
       alert("Successfully saved to Knowledge Base!");
     } catch (err: any) {
       alert("Error saving to KB: " + err.message);
