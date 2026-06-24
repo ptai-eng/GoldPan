@@ -39,9 +39,11 @@ def get_pipeline(source: str, is_file: bool = False, api_key: Optional[str] = No
     if not is_file:
         extractor = HybridWebExtractor(use_playwright_fallback=True)
     else:
-        # Tạm thời dùng MarkItDown cho tất cả các loại file (Bao gồm PDF) để thấy kết quả thật
-        # Khi nào sếp cung cấp bộ core của LiteParse (Rust/WASM) ta sẽ switch lại sau
-        extractor = MarkItDownExtractor(api_key=api_key)
+        ext = os.path.splitext(source)[1].lower()
+        if ext in ['.txt', '.csv', '.json', '.md', '.xml']:
+            extractor = LiteParseExtractor()
+        else:
+            extractor = MarkItDownExtractor(api_key=api_key)
             
     pipeline = GoldPanPipeline(extractor=extractor)
     pipeline.add_filter(HeuristicFilter())
