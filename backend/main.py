@@ -67,7 +67,7 @@ class ChatRequest(BaseModel):
     history: list = []
 
 @app.post("/api/kb/ingest")
-async def ingest_document(req: IngestRequest, x_gemini_api_key: Optional[str] = Header(None)):
+def ingest_document(req: IngestRequest, x_gemini_api_key: Optional[str] = Header(None)):
     if not x_gemini_api_key:
         raise HTTPException(status_code=400, detail="Missing API Key for Ingest. Please configure it in Settings.")
     
@@ -82,7 +82,7 @@ async def ingest_document(req: IngestRequest, x_gemini_api_key: Optional[str] = 
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/kb/documents")
-async def get_documents():
+def get_documents():
     try:
         docs = chroma_manager.get_all_documents()
         return {"documents": docs}
@@ -90,7 +90,7 @@ async def get_documents():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/kb/chat")
-async def chat_with_kb(req: ChatRequest, x_gemini_api_key: Optional[str] = Header(None)):
+def chat_with_kb(req: ChatRequest, x_gemini_api_key: Optional[str] = Header(None)):
     if not x_gemini_api_key:
         raise HTTPException(status_code=400, detail="Missing API Key for Chat. Please configure it in Settings.")
         
@@ -124,7 +124,7 @@ async def chat_with_kb(req: ChatRequest, x_gemini_api_key: Optional[str] = Heade
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/extract/url")
-async def extract_url(req: UrlRequest, x_gemini_api_key: Optional[str] = Header(None)):
+def extract_url(req: UrlRequest, x_gemini_api_key: Optional[str] = Header(None)):
     if not req.url:
         raise HTTPException(status_code=400, detail="URL is required")
         
@@ -138,7 +138,7 @@ async def extract_url(req: UrlRequest, x_gemini_api_key: Optional[str] = Header(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/extract/file")
-async def extract_file(file: UploadFile = File(...), x_gemini_api_key: Optional[str] = Header(None)):
+def extract_file(file: UploadFile = File(...), x_gemini_api_key: Optional[str] = Header(None)):
     file_path = os.path.join(TEMP_DIR, file.filename)
     try:
         with open(file_path, "wb") as buffer:
