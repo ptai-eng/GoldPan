@@ -20,6 +20,20 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [apiKey, setApiKey] = useState("");
   
+  // Persist API Key
+  useEffect(() => {
+    const savedKey = localStorage.getItem("goldpan_api_key");
+    if (savedKey) setApiKey(savedKey);
+  }, []);
+
+  useEffect(() => {
+    if (apiKey) {
+      localStorage.setItem("goldpan_api_key", apiKey);
+    } else {
+      localStorage.removeItem("goldpan_api_key");
+    }
+  }, [apiKey]);
+  
   // App views
   const [activeView, setActiveView] = useState<"extractor" | "kb">("extractor");
   const [kbDocuments, setKbDocuments] = useState<any[]>([]);
