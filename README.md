@@ -1,6 +1,6 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg" width="80" height="80" alt="GoldPan Logo">
-  <h1>GoldPan AI v1.1</h1>
+  <h1>GoldPan AI v1.1.1</h1>
   <p><strong>A powerful, multimodal data extraction and RAG pipeline for AI applications.</strong></p>
   
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -13,7 +13,7 @@
 
 **GoldPan AI** is an open-source utility designed to "pan for gold" in your noisy data. It converts complex, unstructured documents (PDFs, Office files, Images, Audio) and web URLs (YouTube, GitHub, Twitter) into clean, AI-ready Markdown. But it doesn't stop there — it features a built-in **Local Knowledge Base** (powered by ChromaDB) and a **RAG Chatbot**, allowing you to seamlessly index your extracted content and chat with your documents using Google's Gemini 2.5 Flash.
 
-## ✨ Key Features (New in v1.1)
+## ✨ Key Features (New in v1.1.1)
 
 ### 📄 Smart Routing (LiteParse vs MarkItDown)
 - **LiteParse (New):** Native, ultra-fast parsing for simple text-based files (`.txt`, `.csv`, `.json`, `.md`, `.xml`). Bypasses heavy engines to give you millisecond extractions formatted cleanly for LLMs (e.g., CSV to Markdown Tables).
