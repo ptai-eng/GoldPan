@@ -21,7 +21,7 @@ class ChromaManager:
         client = genai.Client(api_key=self.api_key)
         # Gemini embedding API expects a list of strings
         response = client.models.embed_content(
-            model='models/text-embedding-004',
+            model='text-embedding-004',
             contents=texts
         )
         return [e.values for e in response.embeddings]
