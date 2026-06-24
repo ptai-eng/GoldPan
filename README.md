@@ -47,6 +47,15 @@ GoldPan AI is composed of two main services:
 - [Python](https://www.python.org/downloads/) (3.10+)
 - A [Google Gemini API Key](https://aistudio.google.com/) (Required for Vision/Audio extraction and RAG Chat).
 
+### 0. Clone the Repository
+
+To get the latest version (v1.1), open your terminal and run:
+
+```bash
+git clone https://github.com/ptai-eng/GoldPan.git
+cd GoldPan
+```
+
 ### 1. Backend Setup
 
 Open a terminal and navigate to the `backend` directory:
