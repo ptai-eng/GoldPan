@@ -1,144 +1,99 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg" width="80" height="80" alt="GoldPan Logo">
-  <h1>GoldPan AI v1.2.3</h1>
-  <p><strong>A powerful, multimodal data extraction and RAG pipeline for AI applications.</strong></p>
-  <p>✨ <em>GoldPan v1.2.3: Blazing Fast Parallel Processing, Multi-Modal Audio, & Smart API Limits</em> ✨</p>
-  
-  [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
-  [![Next.js 14](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
-  [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-00a393.svg)](https://fastapi.tiangolo.com/)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg" width="80" alt="GoldPan Logo"/>
+  <br/>
+  <h1>GoldPan AI</h1>
+  <h3>A Privacy-First, Multimodal Data Extraction and Local RAG Pipeline</h3>
+  <p>Seamlessly transform unstructured, massive data files into an AI-ready Knowledge Base.</p>
 </div>
 
 ---
 
-**GoldPan AI** is an open-source utility designed to "pan for gold" in your noisy data. It is built to support **files of any size (from tiny text to massive multi-megabyte datasets)** and practically **any format** (PDFs, Office files, Images, Audio, CSVs) as well as web URLs (YouTube, GitHub, Twitter) into clean, AI-ready Markdown. Optimized for heavy multi-tasking, it doesn't stop at extraction — it features a built-in **Local Knowledge Base** (powered by ChromaDB) and a **RAG Chatbot**, allowing you to seamlessly index your extracted content and chat with your documents using Google's Gemini 2.5 Flash.
+## 📖 Introduction
 
-## ✨ Key Features
+**GoldPan AI** is an advanced, privacy-first system designed to address the complexities of modern data extraction and Retrieval-Augmented Generation (RAG). By combining highly optimized parallel processing with Google Gemini's multimodal capabilities, GoldPan acts as a unified pipeline capable of extracting, chunking, and embedding virtually any data format into a Local Knowledge Base. 
 
-### 🚀 Massive Scale & Universal Format Support (v1.2.3)
-- **Unlimited File Size Handling:** Built to handle files of any size, from tiny configurations to massive multi-megabyte documents (e.g., 4MB+ text files). It elegantly manages API quotas (Free vs Paid) and prevents crashes with smart limits.
-- **Blazing Fast Parallel Processing:** Optimized for heavy workloads and multi-tasking. Extensive content is split and processed concurrently using 10-core parallel threading (`ThreadPoolExecutor`), increasing extraction speed up to 10x without sacrificing quality.
-- **Universal Format Support:** True multimodal extraction. Throw anything at it—heavy PDFs, Word documents, massive CSV datasets, high-res Images, or long Audio files (`.mp3`, `.wav`)—GoldPan processes them all seamlessly.
+Whether you are dealing with massive enterprise documents, hours of audio, or dynamic web content, GoldPan AI provides a centralized, intuitive workspace that bridges the gap between raw, unstructured data and actionable AI intelligence.
 
-### 🛡️ Stability & Hotfixes (v1.2.1)
-- **Crash Prevention:** Hardened the Playwright web scraper against JavaScript timeouts and infinite network loops (e.g. GitHub repos).
-- **AI Optimization:** Corrected Google Gemini SDK integrations to prevent 503 internal server errors during extraction.
-- **Automated QA Suite:** Included a comprehensive `test_api.py` automation suite ensuring 100% extraction stability across 10+ file and URL formats.
+![GoldPan AI Interface](screenshot.png)
+*(The GoldPan AI Workspace and Knowledge Base Chat Interface)*
 
-### 🎨 UI/UX Optimization (v1.2)
-- **Settings Modal:** Intuitively manage Light/Dark Mode and UI scale (Zoom 75% - 125%).
-- **Collapsible Sidebar:** Flexible navigation sidebar that can be toggled to maximize your workspace.
-- **High Performance:** Removed heavy CSS animations and layout thrashing to ensure ultra-smooth performance, even on low-end office laptops without dedicated GPUs.
-- **API Key Security:** Manage your Gemini API Key securely within Settings, featuring input validation and local storage persistence.
+## ✨ Core Capabilities
 
-### 📄 Smart Routing (LiteParse vs MarkItDown)
-- **LiteParse (New):** Native, ultra-fast parsing for simple text-based files (`.txt`, `.csv`, `.json`, `.md`, `.xml`). Bypasses heavy engines to give you millisecond extractions formatted cleanly for LLMs (e.g., CSV to Markdown Tables).
-- **MarkItDown (Heavy Lifting):** Natively converts PDF, DOCX, XLSX, PPTX, and HTML into Markdown using Microsoft's `MarkItDown`.
-- **Multimodal (Vision & Audio):** Seamlessly processes Images (`.jpg`, `.png`) and Audio (`.mp3`, `.wav`) using Google Gemini's Multimodal capabilities to extract text, transcriptions, and EXIF metadata.
+### 1. Universal Format Support & Multimodal Extraction
+GoldPan AI is engineered to ingest practically any data format seamlessly:
+- **Documents & Text:** PDFs, DOCX, CSVs, TXT, Markdown.
+- **Media (Vision & Audio):** High-resolution Images (JPG, PNG) and Audio files (MP3, WAV) are natively supported using Gemini's state-of-the-art multimodal extraction.
+- **Web & Dynamic Content:** YouTube videos (direct transcript fetching bypassing HTML scraping), GitHub Blob URLs (automatic conversion to raw code), and dynamic JavaScript-heavy sites via fallback headless browsing.
 
-### 🌐 Smart Web Routing
-- **YouTube Transcripts:** Automatically bypasses HTML scraping and fetches the exact video transcript in milliseconds.
-- **GitHub Raw Fallback:** Intelligently converts GitHub blob URLs into RAW format to extract clean source code.
-- **JavaScript-Heavy Sites:** Uses a headless `Playwright` browser as a fallback to scrape dynamic content from platforms like Twitter and Facebook.
+### 2. Heavy Workload Optimization
+Handling large-scale data is a primary design goal.
+- **Massive File Support:** The architecture safely processes documents regardless of their size, circumventing traditional LLM context-window limitations.
+- **Parallel Processing:** Built-in multi-threading (`ThreadPoolExecutor`) ensures lightning-fast chunking, embedding, and API communication, accelerating extraction processes up to 10x compared to sequential pipelines.
 
-### 🧠 Local Knowledge Base & RAG Chatbot
-- **100% Offline Vector Storage:** Embeds and stores your documents locally using `ChromaDB` and HuggingFace's `all-MiniLM-L6-v2` model. No cloud database required.
-- **One-Click Ingest:** Save any extracted document directly to your Knowledge Base with a single click.
-- **Interactive Chat:** Ask questions and retrieve answers grounded strictly in your ingested documents using Semantic Search and Gemini 2.5 Flash.
+### 3. Integrated Knowledge Base (KB) Workspace
+A sophisticated environment for persistent data management:
+- **Local Vector Database:** Powered by `ChromaDB`, ensuring all your vectorized knowledge remains strictly local, persistent, and secure.
+- **Physical Markdown Storage:** When documents are ingested into the KB, they are also physically saved as clean `.md` files in a centralized `KB/` directory, allowing for external version control and direct human review.
+- **Seamless Document Management:** Easily track, review, and delete documents directly from the UI.
 
----
+### 4. Interactive RAG Chat Assistant
+Interact intelligently with your processed data:
+- **Context-Aware AI:** Ask complex questions and receive accurate answers grounded *strictly* in the documents you have ingested.
+- **Persistent Chat History:** Conversations are saved locally, ensuring continuity across sessions. 
+- **Premium UI/UX:** An elegant, "Dark Stone & Gold" aesthetic built with Next.js and TailwindCSS, prioritizing reading space, focus, and modern design principles.
 
-## 🏗 Architecture
+## 🏗️ System Architecture
 
-GoldPan AI is composed of two main services:
-1. **Backend (Python & FastAPI):** Handles file parsing, web scraping, chunking, Vector DB (ChromaDB) operations, and LLM orchestration (`google-genai`).
-2. **Frontend (Next.js & Tailwind CSS):** Provides a sleek, dark-themed, highly interactive UI to manage your extractions and chat with your Knowledge Base.
-
----
+GoldPan AI operates on a robust decoupled architecture:
+- **Backend (FastAPI):** Manages the extraction pipelines (`markitdown`, `trafilatura`, `youtube-transcript-api`), asynchronous HTTP requests, chunking algorithms, and vector embeddings.
+- **Frontend (Next.js 14):** Provides an interactive, highly responsive Single Page Application (SPA) with real-time progress tracking, error handling, and chat interfaces.
+- **AI Engine:** Utilizes Google Gemini 1.5 Flash for rapid multimodal extraction and Gemini Embedding models for high-dimensional vector representations.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/en/) (v18+)
-- [Python](https://www.python.org/downloads/) (3.10+)
-- A [Google Gemini API Key](https://aistudio.google.com/) (Required for Vision/Audio extraction and RAG Chat).
+- Python 3.10+
+- Node.js 18+
+- A Google Gemini API Key
 
-### 0. Clone the Repository
+### Installation
 
-To get the latest version (v1.2.3), open your terminal and run:
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/GoldPan.git
+   cd GoldPan
+   ```
 
-```bash
-git clone -b v1.2.3 https://github.com/ptai-eng/GoldPan.git
-cd GoldPan
-```
+2. **Setup Backend**
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-### 1. Backend Setup
+3. **Setup Frontend**
+   ```bash
+   cd ../frontend
+   npm install
+   ```
 
-Open a terminal and navigate to the `backend` directory:
+### Running the Application
 
-```bash
-cd backend
+1. **Start Backend Server**
+   ```bash
+   cd backend
+   uvicorn main:app --reload --port 8000
+   ```
 
-# Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+2. **Start Frontend Client**
+   ```bash
+   cd frontend
+   npm run dev
+   ```
 
-# Install dependencies
-pip install -r requirements.txt
+3. Open `http://localhost:3000` in your browser. Configure your Gemini API Key in the Settings panel, and begin extracting!
 
-# Install Playwright browsers (for web scraping)
-playwright install
-```
+## 📜 License
 
-Create a `.env` file in the `backend` folder and add your Gemini API Key (Optional, you can also input it directly via the Web UI):
-```env
-GEMINI_API_KEY=your_api_key_here
-```
-
-Start the FastAPI server:
-```bash
-uvicorn main:app --reload --port 8000
-```
-
-### 2. Frontend Setup
-
-Open a new terminal and navigate to the `frontend` directory:
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Start the development server
-npm run dev
-```
-
-Visit `http://localhost:3000` in your browser.
-
----
-
-## 🛠 Usage Guide
-
-### 1. Extract Content
-- In the **Extractor Engine** tab, drag and drop any file (PDF, PPTX, JPG, MP3) or paste a Web Link (YouTube, GitHub, etc.).
-- Input your `Gemini API Key` in the bottom left corner if you are processing Media files.
-- Click **Start Extraction**. The system will output clean Markdown.
-
-### 2. Build your Knowledge Base
-- Once the extraction is successful, click the **Save to KB** button.
-- The backend will automatically chunk the text, generate embeddings using a local HuggingFace model, and store it in ChromaDB.
-
-### 3. Chat with your Data
-- Switch to the **Knowledge Base** tab using the left sidebar.
-- You will see a list of your ingested documents on the left.
-- Use the Chat interface on the right to ask questions. The AI will answer based *only* on the facts present in your extracted documents.
-
----
-
-## 🤝 Contributing
-Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/yourusername/goldpan/issues).
-
-## 📄 License
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

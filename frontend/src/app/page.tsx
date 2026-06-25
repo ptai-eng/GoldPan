@@ -2,11 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  UploadCloud, Link as LinkIcon, Loader2, FileText, 
-  X, Sparkles, LayoutTemplate, Database, 
-  Settings, ChevronRight, CheckCircle2, Download, Clock, Menu
-} from "lucide-react";
+import { Search, Sparkles, FileText, CheckCircle2, FileJson, Link as LinkIcon, Download, Save, Maximize2, Minimize2, Trash2, UploadCloud, Loader2, X, LayoutTemplate, Database, Settings, ChevronRight, Clock, Menu } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 export default function Home() {
@@ -78,6 +74,8 @@ export default function Home() {
     }
   }, [apiKey]);
 
+
+
   const handleConfirmApiKey = () => {
     if (tempApiKey.trim() === "") {
       setApiKey("");
@@ -100,6 +98,22 @@ export default function Home() {
   const [chatInput, setChatInput] = useState("");
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [isSavingKb, setIsSavingKb] = useState(false);
+
+  // Persist Chat History
+  useEffect(() => {
+    const savedChat = localStorage.getItem("goldpan_chat_history");
+    if (savedChat) {
+      try {
+        setChatHistory(JSON.parse(savedChat));
+      } catch (e) {
+        console.error("Failed to parse chat history", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("goldpan_chat_history", JSON.stringify(chatHistory));
+  }, [chatHistory]);
 
   // Timer states
   const [estimatedSeconds, setEstimatedSeconds] = useState(0);
@@ -260,6 +274,24 @@ export default function Home() {
     }
   };
 
+  const deleteDocument = async (docId: string) => {
+    const confirmed = window.confirm("Are you sure you want to delete this document from the Knowledge Base?");
+    if (!confirmed) return;
+    try {
+      const res = await fetch(`http://localhost:8000/api/kb/documents/${docId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchKbDocuments();
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        alert("Failed to delete: " + (errorData.detail || "Unknown error"));
+      }
+    } catch (err: any) {
+      alert("Error deleting document: " + err.message);
+    }
+  };
+
   const handleSendChat = async () => {
     if (!chatInput.trim() || isChatLoading) return;
     
@@ -307,7 +339,11 @@ export default function Home() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex overflow-hidden selection:bg-accent selection:text-primary">
+    <div className="min-h-screen bg-background text-foreground flex overflow-hidden selection:bg-primary/30 selection:text-primary-foreground relative">
+      {/* Decorative Glow */}
+      <div className="absolute top-[-20%] right-[-10%] w-[800px] h-[800px] rounded-full bg-[radial-gradient(circle,_rgba(250,204,21,0.03)_0%,_transparent_70%)] pointer-events-none z-0"></div>
+      <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-[radial-gradient(circle,_rgba(250,204,21,0.02)_0%,_transparent_70%)] pointer-events-none z-0"></div>
+
       
       {/* Sidebar */}
       <aside className={`border-r border-border bg-panel hidden md:flex flex-col transition-[width,opacity] duration-300 ease-in-out overflow-hidden ${isSidebarOpen ? 'w-64 opacity-100' : 'w-0 opacity-0 border-r-0'}`}>
@@ -369,7 +405,7 @@ export default function Home() {
           {activeView === "extractor" ? (
             <>
               {/* Left Panel: Controls */}
-              <div className="w-full lg:w-1/3 border-r border-border/50 bg-panel/30 p-8 overflow-y-auto flex flex-col gap-8 z-10">
+              <div className="w-full lg:w-[320px] shrink-0 border-r border-border/50 bg-panel/30 p-8 overflow-y-auto flex flex-col gap-8 z-10">
                 
                 <div>
                   <h1 className="text-2xl font-semibold text-primary mb-2">Extract Content</h1>
@@ -613,7 +649,7 @@ export default function Home() {
           ) : (
             <>
               {/* Left Panel: List of Docs in KB */}
-              <div className="w-full lg:w-1/3 border-r border-border/50 bg-panel/30 p-8 overflow-y-auto flex flex-col gap-8 z-10">
+              <div className="w-full lg:w-[320px] shrink-0 border-r border-border/50 bg-panel/30 p-8 overflow-y-auto flex flex-col gap-8 z-10">
                 <div>
                   <h1 className="text-2xl font-semibold text-primary mb-2">Knowledge Base</h1>
                   <p className="text-sm text-muted-foreground leading-relaxed">
@@ -626,12 +662,17 @@ export default function Home() {
                     <div className="text-muted-foreground text-sm italic">No documents found. Extract something and click 'Save to KB'.</div>
                   ) : (
                     kbDocuments.map((doc, idx) => (
-                      <div key={idx} className="bg-panel border border-panel-border p-4 rounded-xl flex items-start gap-3 hover:border-panel-border transition-colors">
-                        <FileText className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
-                        <div>
-                          <p className="text-sm font-medium text-foreground line-clamp-1">{doc.title}</p>
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-1 font-mono">{doc.source}</p>
+                      <div key={idx} className="bg-panel border border-panel-border p-4 rounded-xl flex items-start justify-between gap-3 hover:border-panel-border transition-colors">
+                        <div className="flex items-start gap-3 overflow-hidden">
+                          <FileText className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                          <div className="overflow-hidden">
+                            <p className="text-sm font-medium text-foreground line-clamp-1" title={doc.title}>{doc.title}</p>
+                            <p className="text-xs text-muted-foreground mt-1 line-clamp-1 font-mono" title={doc.source}>{doc.source}</p>
+                          </div>
                         </div>
+                        <button onClick={() => deleteDocument(doc.id)} className="text-muted-foreground hover:text-red-500 transition shrink-0 p-1" title="Delete from Knowledge Base">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     ))
                   )}
@@ -645,6 +686,18 @@ export default function Home() {
                 <div className="flex-1 border border-border bg-panel/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-sm">
                   <div className="h-14 border-b border-border flex items-center justify-between px-4 bg-panel">
                     <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider font-semibold">GoldPan AI Assistant</span>
+                    {chatHistory.length > 0 && (
+                      <button 
+                        onClick={() => {
+                          if (window.confirm("Are you sure you want to clear the chat history?")) {
+                            setChatHistory([]);
+                          }
+                        }}
+                        className="text-xs text-muted-foreground hover:text-red-400 transition-colors flex items-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" /> Clear
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-6 font-sans">

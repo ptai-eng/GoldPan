@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .env
 .pytest_cache/
+backend/chroma_data/
+KB/

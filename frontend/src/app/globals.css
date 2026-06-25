@@ -16,17 +16,17 @@
 
 @layer base {
   :root {
-    --bg: #000000;
-    --fg: #d4d4d8;
-    --muted: #18181b;
-    --muted-fg: #a1a1aa;
-    --primary: #ffffff;
-    --primary-fg: #000000;
-    --accent: #27272a;
-    --accent-fg: #fafafa;
-    --border: #27272a;
-    --panel: #050505;
-    --panel-border: #18181b;
+    --bg: #0C0A09; /* stone-950 */
+    --fg: #e7e5e4; /* stone-200 */
+    --muted: #1c1917; /* stone-900 */
+    --muted-fg: #a8a29e; /* stone-400 */
+    --primary: #facc15; /* yellow-400 (Gold) */
+    --primary-fg: #422006; /* dark brown */
+    --accent: #292524; /* stone-800 */
+    --accent-fg: #facc15; /* yellow-400 */
+    --border: #292524; /* stone-800 */
+    --panel: #131110; /* slightly lighter than bg */
+    --panel-border: #292524; /* stone-800 */
   }
 
   .light {

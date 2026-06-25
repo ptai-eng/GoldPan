@@ -12,12 +12,20 @@ class GeminiMultimodalConverter(DocumentConverter):
         else:
             self.client = None
 
-    def convert(self, local_path, **kwargs) -> DocumentConverterResult:
+    def accepts(self, file_stream, stream_info, **kwargs) -> bool:
+        if stream_info and stream_info.extension:
+            ext = stream_info.extension.lower()
+            if not ext.startswith('.'):
+                ext = '.' + ext
+            return ext in ['.jpg', '.jpeg', '.png', '.webp', '.mp3', '.wav', '.ogg', '.m4a']
+        return False
+
+    def convert(self, file_stream, stream_info, **kwargs) -> DocumentConverterResult:
+        local_path = getattr(file_stream, "name", None)
+        if not local_path or not isinstance(local_path, str) or not os.path.exists(local_path):
+            raise ValueError("Gemini API needs a local file path.")
         source_str = str(local_path)
-        mime_type, _ = mimetypes.guess_type(source_str)
-        if not mime_type or not (mime_type.startswith('image/') or mime_type.startswith('audio/')):
-            return None # Bỏ qua, để các converter khác của MarkItDown xử lý
-            
+        
         if not self.client:
             raise ValueError("Missing API Key for Image/Audio processing. Please configure your Gemini API Key in Settings.")
             
@@ -35,14 +43,16 @@ class GeminiMultimodalConverter(DocumentConverter):
                 text_content=response.text
             )
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             raise ValueError(f"Gemini multimodal processing failed: {str(e)}")
 
 class MarkItDownExtractor:
     def __init__(self, api_key: str = None):
         self.md_client = MarkItDown()
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
-        # Đăng ký plugin đọc Ảnh/Audio bằng Gemini
-        self.md_client.register_converter(GeminiMultimodalConverter(self.api_key), priority=5.0)
+        # Đăng ký plugin đọc Ảnh/Audio bằng Gemini (ưu tiên cao hơn mặc định)
+        self.md_client.register_converter(GeminiMultimodalConverter(self.api_key), priority=-1.0)
 
     def extract(self, source: str) -> RawContent:
         if not os.path.exists(source):

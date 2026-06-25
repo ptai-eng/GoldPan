@@ -34,7 +34,7 @@ def test_files():
     print("\n--- Testing File Extractions ---")
     files_to_test = [
         "sample.txt", "sample.csv", "sample.json", "sample.md", "sample.xml",
-        "sample.pdf", "sample.docx"
+        "sample.pdf", "sample.docx", "sample.jpg", "sample.mp3", "heavy_sample.txt"
     ]
     
     for filename in files_to_test:

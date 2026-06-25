@@ -17,12 +17,17 @@ for filename, content in texts.items():
     with open(os.path.join(SAMPLES_DIR, filename), "w", encoding="utf-8") as f:
         f.write(content)
 
-# 2. Binary files (Download from public URLs)
+# 2. Heavy files (Simulate large documents > 1MB)
+heavy_text = "This is a heavy paragraph containing useless noise and some valuable information. " * 50000 # ~4MB file
+with open(os.path.join(SAMPLES_DIR, "heavy_sample.txt"), "w", encoding="utf-8") as f:
+    f.write(heavy_text)
+
+# 3. Binary files (Download from public URLs)
 urls = {
     "sample.pdf": "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
     "sample.docx": "https://calibre-ebook.com/downloads/demos/demo.docx",
-    "sample.jpg": "https://via.placeholder.com/150",
-    # MP3, XLSX might be too large or hard to find stable URLs, let's use tiny equivalents or skip binary if not needed.
+    "sample.jpg": "https://picsum.photos/800/600.jpg",
+    "sample.mp3": "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
 }
 
 for filename, url in urls.items():

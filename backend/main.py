@@ -74,10 +74,42 @@ def ingest_document(req: IngestRequest, x_gemini_api_key: Optional[str] = Header
     try:
         chroma_manager.set_api_key(x_gemini_api_key)
         doc_id = str(uuid.uuid4())
-        # Attach doc_id to metadata so we can retrieve it
         req.metadata['document_id'] = doc_id
+        
+        # Lấy tên file gốc hoặc URL
+        source_name = req.metadata.get('file_path') or req.metadata.get('source_url') or req.metadata.get('title') or doc_id
+        
+        # Save to physical file
+        kb_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "KB")
+        os.makedirs(kb_dir, exist_ok=True)
+        
+        import re
+        safe_filename = re.sub(r'[\\/*?:"<>|]', "", os.path.basename(source_name))[:50] + f"_{doc_id[:8]}.md"
+        physical_path = os.path.join(kb_dir, safe_filename)
+        
+        with open(physical_path, "w", encoding="utf-8") as f:
+            f.write(req.markdown)
+            
+        req.metadata['physical_file'] = physical_path
+        
         chroma_manager.ingest_document(document_id=doc_id, text=req.markdown, metadata=req.metadata)
-        return {"status": "success", "document_id": doc_id}
+        return {"status": "success", "document_id": doc_id, "physical_file": physical_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/kb/documents/{document_id}")
+def delete_document(document_id: str):
+    try:
+        docs = chroma_manager.collection.get(where={"document_id": document_id}, include=["metadatas"])
+        if docs and docs.get("metadatas"):
+            for meta in docs["metadatas"]:
+                if meta and "physical_file" in meta:
+                    p = meta["physical_file"]
+                    if os.path.exists(p):
+                        os.remove(p)
+                    break
+        chroma_manager.delete_document(document_id)
+        return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -131,9 +163,11 @@ def extract_url(req: UrlRequest, x_gemini_api_key: Optional[str] = Header(None))
     pipeline = get_pipeline(req.url, is_file=False, api_key=x_gemini_api_key)
     try:
         result = pipeline.process(req.url)
-        # return dict, Pydantic dict() is deprecated in v2, use model_dump() if available
-        # But we'll just return raw fields to be safe
-        return {"markdown": result.text, "metadata": {"file_path": result.doc_info.file_path, "title": result.doc_info.title}}
+        return {"markdown": result.text, "metadata": {
+            "file_path": getattr(result.doc_info, "file_path", None), 
+            "source_url": getattr(result.doc_info, "source_url", None), 
+            "title": result.doc_info.title
+        }}
     except Exception as e:
         error_msg = str(e)
         if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
@@ -153,7 +187,11 @@ def extract_file(file: UploadFile = File(...), x_gemini_api_key: Optional[str] =
         pipeline = get_pipeline(file_path, is_file=True, api_key=x_gemini_api_key)
         result = pipeline.process(file_path)
         
-        return {"markdown": result.text, "metadata": {"file_path": result.doc_info.file_path, "title": result.doc_info.title}}
+        return {"markdown": result.text, "metadata": {
+            "file_path": file.filename, 
+            "source_url": getattr(result.doc_info, "source_url", None), 
+            "title": result.doc_info.title
+        }}
     except Exception as e:
         error_msg = str(e)
         if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
