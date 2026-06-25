@@ -63,12 +63,15 @@ CRITICAL RULES:
 4. Preserve all Markdown formatting (headers, lists, tables).
 Just output the clean Markdown text."""
 
+        import concurrent.futures
+
         # Chia chunk để tránh lỗi vượt quá Output Token Limit của LLM (8192 tokens)
         chunk_size = 15000 # Khoảng ~3000 tokens mỗi block
         chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
         
-        cleaned_chunks = []
-        for chunk in chunks:
+        cleaned_chunks = [None] * len(chunks)
+        
+        def process_chunk(idx, chunk):
             try:
                 response = self.client.models.generate_content(
                     model=self.model_name,
@@ -84,11 +87,18 @@ Just output the clean Markdown text."""
                 elif c_text.startswith("```"): c_text = c_text[3:]
                 if c_text.endswith("```"): c_text = c_text[:-3]
                 
-                cleaned_chunks.append(c_text.strip())
+                return idx, c_text.strip()
             except Exception as e:
-                print(f"[SemanticRouter] Gemini API Failed on chunk: {e}.")
+                print(f"[SemanticRouter] Gemini API Failed on chunk {idx}: {e}")
                 # Fallback: Giữ nguyên chunk đó nếu API lỡ bị lỗi (Rate limit, safety...)
-                cleaned_chunks.append(chunk) 
+                return idx, chunk
+                
+        # Run up to 10 threads concurrently to massively speed up extraction
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(process_chunk, i, chunk) for i, chunk in enumerate(chunks)]
+            for future in concurrent.futures.as_completed(futures):
+                idx, res = future.result()
+                cleaned_chunks[idx] = res
                 
         final_text = '\n\n'.join(cleaned_chunks)
         

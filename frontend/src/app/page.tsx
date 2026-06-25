@@ -103,22 +103,19 @@ export default function Home() {
 
   // Timer states
   const [estimatedSeconds, setEstimatedSeconds] = useState(0);
-  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Timer countdown logic
+  // Timer elapsed logic
   useEffect(() => {
-    if (status === 'loading' && remainingSeconds > 0) {
+    if (status === 'loading') {
       const timer = setTimeout(() => {
-        // Dừng ở 1 giây nếu backend chưa xử lý xong để tránh bị nhảy qua số âm
-        if (remainingSeconds > 1) {
-          setRemainingSeconds(r => r - 1);
-        }
+        setElapsedSeconds(r => r + 1);
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [status, remainingSeconds]);
+  }, [status, elapsedSeconds]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -161,7 +158,7 @@ export default function Home() {
     
     // URL thường nhanh hơn, ước tính 8 giây
     setEstimatedSeconds(8);
-    setRemainingSeconds(8);
+    setElapsedSeconds(0);
     setStatus("loading");
     
     try {
@@ -175,8 +172,6 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Failed to process URL");
-      
-      setRemainingSeconds(0); // Force về 0 khi xong
       setResult(data);
       setStatus("success");
     } catch (err: any) {
@@ -196,7 +191,7 @@ export default function Home() {
     // Tính toán thời gian dựa trên dung lượng file
     const est = calculateEstimate(file.size);
     setEstimatedSeconds(est);
-    setRemainingSeconds(est);
+    setElapsedSeconds(0);
     setStatus("loading");
     
     const formData = new FormData();
@@ -212,8 +207,6 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Failed to process file");
-      
-      setRemainingSeconds(0); // Force về 0 khi xong
       setResult(data);
       setStatus("success");
     } catch (err: any) {
@@ -227,7 +220,7 @@ export default function Home() {
     setResult(null);
     setFile(null);
     setUrl("");
-    setRemainingSeconds(0);
+    setElapsedSeconds(0);
     setEstimatedSeconds(0);
   };
 
@@ -567,19 +560,19 @@ export default function Home() {
                     <div className="flex flex-col items-center gap-2 relative">
                       <Clock className="w-8 h-8 text-muted-foreground mb-2 animate-pulse" />
                       <div className="text-3xl font-mono text-primary font-light tracking-widest">
-                        {formatTime(remainingSeconds)}
+                        {formatTime(elapsedSeconds)}
                       </div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-widest">Estimated Time Remaining</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-widest">Elapsed Time</p>
                       
                       <AnimatePresence>
-                        {remainingSeconds === 1 && (
+                        {elapsedSeconds > 3 && (
                           <motion.div 
                             initial={{ opacity: 0, y: 5 }} 
                             animate={{ opacity: 1, y: 0 }} 
-                            className="absolute -bottom-10 whitespace-nowrap text-xs font-medium text-red-400/80 bg-red-950/40 px-3 py-1.5 rounded-full border border-red-900/50 flex items-center gap-2"
+                            className="absolute -bottom-10 whitespace-nowrap text-xs font-medium text-amber-400/80 bg-amber-950/40 px-3 py-1.5 rounded-full border border-amber-900/50 flex items-center gap-2"
                           >
                             <Loader2 className="w-3 h-3 animate-spin" />
-                            <span>Processing complex data... Please wait a moment.</span>
+                            <span>Processing complex data... Please wait.</span>
                           </motion.div>
                         )}
                       </AnimatePresence>
