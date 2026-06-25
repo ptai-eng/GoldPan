@@ -61,7 +61,7 @@ GoldPan AI is composed of two main services:
 
 ### 0. Clone the Repository
 
-To get the latest version (v1.1), open your terminal and run:
+To get the latest version (v1.2.1), open your terminal and run:
 
 ```bash
 git clone https://github.com/ptai-eng/GoldPan.git
