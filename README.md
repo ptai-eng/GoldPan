@@ -87,15 +87,17 @@ GoldPan AI operates on a robust decoupled architecture:
 
 ### Running the Application
 
-1. **Start Backend Server**
+1. **Start Backend Server (Terminal 1)**
    ```powershell
    cd backend
+   .\venv\Scripts\activate
    uvicorn main:app --reload --port 8000
    ```
 
-2. **Start Frontend Client**
+2. **Start Frontend Client (Terminal 2)**
+   Open a **new** terminal window from the root `GoldPan` directory:
    ```powershell
-   cd ..\frontend
+   cd frontend
    npm run dev
    ```
 
