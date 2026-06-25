@@ -1,8 +1,8 @@
 <div align="center">
   <img src="https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/sparkles.svg" width="80" height="80" alt="GoldPan Logo">
-  <h1>GoldPan AI v1.2.1</h1>
+  <h1>GoldPan AI v1.2.3</h1>
   <p><strong>A powerful, multimodal data extraction and RAG pipeline for AI applications.</strong></p>
-  <p>✨ <em>GoldPan v1.2.1: Optimized, lightweight, and beautiful UI suitable for all users</em> ✨</p>
+  <p>✨ <em>GoldPan v1.2.3: Blazing Fast Parallel Processing, Multi-Modal Audio, & Smart API Limits</em> ✨</p>
   
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
   [![Next.js 14](https://img.shields.io/badge/Next.js-14-black)](https://nextjs.org/)
@@ -61,10 +61,10 @@ GoldPan AI is composed of two main services:
 
 ### 0. Clone the Repository
 
-To get the latest version (v1.2.1), open your terminal and run:
+To get the latest version (v1.2.3), open your terminal and run:
 
 ```bash
-git clone https://github.com/ptai-eng/GoldPan.git
+git clone -b v1.2.3 https://github.com/ptai-eng/GoldPan.git
 cd GoldPan
 ```
 
