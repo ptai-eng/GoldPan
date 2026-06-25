@@ -19,12 +19,15 @@ class ChromaManager:
         if not self.api_key:
             raise ValueError("Gemini API Key is required for Knowledge Base operations.")
         client = genai.Client(api_key=self.api_key)
-        # Gemini embedding API expects a list of strings
-        response = client.models.embed_content(
-            model='embedding-001',
-            contents=texts
-        )
-        return [e.values for e in response.embeddings]
+        embeddings = []
+        for text in texts:
+            response = client.models.embed_content(
+                model='text-embedding-004',
+                contents=text
+            )
+            # The new SDK returns an object where embeddings is a list
+            embeddings.append(response.embeddings[0].values)
+        return embeddings
 
     def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
         chunks = []
