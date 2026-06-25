@@ -68,11 +68,16 @@ class HybridWebExtractor:
         )
 
     def _extract_with_playwright(self, url: str) -> str:
-        from playwright.sync_api import sync_playwright
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page()
-            page.goto(url, wait_until="networkidle")
-            html = page.content()
-            browser.close()
-            return html
+        try:
+            from playwright.sync_api import sync_playwright
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                # Use domcontentloaded to avoid hanging on GitHub websockets
+                page.goto(url, wait_until="domcontentloaded", timeout=15000)
+                html = page.content()
+                browser.close()
+                return html
+        except Exception as e:
+            print(f"[Playwright Fallback] Failed: {e}")
+            return f"<html><body><h1>Extraction Failed</h1><p>{str(e)}</p></body></html>"

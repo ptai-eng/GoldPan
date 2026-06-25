@@ -14,7 +14,7 @@ class SemanticRouterFilter:
         if self.use_api and self.api_key:
             # Use the new Google GenAI SDK
             self.client = genai.Client(api_key=self.api_key)
-            self.model_name = 'gemini-flash-latest'
+            self.model_name = 'gemini-2.5-flash'
         else:
             self.client = None
 
