@@ -303,7 +303,7 @@ export default function Home() {
 
   // Tính phần trăm chạy của progress bar
   const progressPercent = estimatedSeconds > 0 
-    ? Math.min(100, Math.max(0, ((estimatedSeconds - remainingSeconds) / estimatedSeconds) * 100)) 
+    ? Math.min(98, (elapsedSeconds / estimatedSeconds) * 100) 
     : 0;
 
   return (
