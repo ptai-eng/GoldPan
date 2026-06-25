@@ -66,36 +66,36 @@ GoldPan AI operates on a robust decoupled architecture:
 ### Installation
 
 1. **Clone the repository**
-   ```bash
-   git clone https://github.com/your-username/GoldPan.git
+   ```powershell
+   git clone https://github.com/ptai-eng/GoldPan.git
    cd GoldPan
    ```
 
 2. **Setup Backend**
-   ```bash
+   ```powershell
    cd backend
    python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   .\venv\Scripts\activate
    pip install -r requirements.txt
    ```
 
 3. **Setup Frontend**
-   ```bash
-   cd ../frontend
+   ```powershell
+   cd ..\frontend
    npm install
    ```
 
 ### Running the Application
 
 1. **Start Backend Server**
-   ```bash
+   ```powershell
    cd backend
    uvicorn main:app --reload --port 8000
    ```
 
 2. **Start Frontend Client**
-   ```bash
-   cd frontend
+   ```powershell
+   cd ..\frontend
    npm run dev
    ```
 
