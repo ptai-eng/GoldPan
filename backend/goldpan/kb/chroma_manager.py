@@ -21,11 +21,11 @@ class ChromaManager:
         
         import requests
         embeddings = []
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key={self.api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key={self.api_key}"
         
         for text in texts:
             payload = {
-                "model": "models/text-embedding-004",
+                "model": "models/gemini-embedding-001",
                 "content": {
                     "parts": [{"text": text}]
                 }
