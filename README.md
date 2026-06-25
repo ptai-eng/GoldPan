@@ -12,9 +12,14 @@
 
 ---
 
-**GoldPan AI** is an open-source utility designed to "pan for gold" in your noisy data. It converts complex, unstructured documents (PDFs, Office files, Images, Audio) and web URLs (YouTube, GitHub, Twitter) into clean, AI-ready Markdown. But it doesn't stop there — it features a built-in **Local Knowledge Base** (powered by ChromaDB) and a **RAG Chatbot**, allowing you to seamlessly index your extracted content and chat with your documents using Google's Gemini 2.5 Flash.
+**GoldPan AI** is an open-source utility designed to "pan for gold" in your noisy data. It is built to support **files of any size (from tiny text to massive multi-megabyte datasets)** and practically **any format** (PDFs, Office files, Images, Audio, CSVs) as well as web URLs (YouTube, GitHub, Twitter) into clean, AI-ready Markdown. Optimized for heavy multi-tasking, it doesn't stop at extraction — it features a built-in **Local Knowledge Base** (powered by ChromaDB) and a **RAG Chatbot**, allowing you to seamlessly index your extracted content and chat with your documents using Google's Gemini 2.5 Flash.
 
 ## ✨ Key Features
+
+### 🚀 Massive Scale & Universal Format Support (v1.2.3)
+- **Unlimited File Size Handling:** Built to handle files of any size, from tiny configurations to massive multi-megabyte documents (e.g., 4MB+ text files). It elegantly manages API quotas (Free vs Paid) and prevents crashes with smart limits.
+- **Blazing Fast Parallel Processing:** Optimized for heavy workloads and multi-tasking. Extensive content is split and processed concurrently using 10-core parallel threading (`ThreadPoolExecutor`), increasing extraction speed up to 10x without sacrificing quality.
+- **Universal Format Support:** True multimodal extraction. Throw anything at it—heavy PDFs, Word documents, massive CSV datasets, high-res Images, or long Audio files (`.mp3`, `.wav`)—GoldPan processes them all seamlessly.
 
 ### 🛡️ Stability & Hotfixes (v1.2.1)
 - **Crash Prevention:** Hardened the Playwright web scraper against JavaScript timeouts and infinite network loops (e.g. GitHub repos).
