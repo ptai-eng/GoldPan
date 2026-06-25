@@ -4,6 +4,13 @@
   <h1>GoldPan AI</h1>
   <h3>A Privacy-First, Multimodal Data Extraction and Local RAG Pipeline</h3>
   <p>Seamlessly transform unstructured, massive data files into an AI-ready Knowledge Base.</p>
+
+  <p>
+    <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.10+-blue.svg" alt="Python 3.10+"></a>
+    <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-14-black" alt="Next.js 14"></a>
+    <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.100+-00a393.svg" alt="FastAPI"></a>
+    <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"></a>
+  </p>
 </div>
 
 ---
