@@ -184,8 +184,8 @@ export default function Home() {
     if (!file) return;
     
     if (file.size > 1024 * 1024 && !apiKey) {
-      const proceed = window.confirm("⚠️ Large Document Detected (>1MB)\n\nSince no Gemini API Key is provided, the system will fallback to basic Local Regex filtering, which may result in lower quality cleaning.\n\nDo you want to proceed with Local processing?");
-      if (!proceed) return;
+      alert("Dung lượng file vượt quá giới hạn 1MB của API miễn phí.\n\nVui lòng nhập API trả phí của bạn vào mục Settings (Cài Đặt) ở giao diện chính để xử lý file nặng này.");
+      return;
     }
     
     // Tính toán thời gian dựa trên dung lượng file

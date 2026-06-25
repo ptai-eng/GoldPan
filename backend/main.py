@@ -135,10 +135,16 @@ def extract_url(req: UrlRequest, x_gemini_api_key: Optional[str] = Header(None))
         # But we'll just return raw fields to be safe
         return {"markdown": result.text, "metadata": {"file_path": result.doc_info.file_path, "title": result.doc_info.title}}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e)
+        if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+            raise HTTPException(status_code=429, detail="API miễn phí đã vượt quá hạn mức. Vui lòng nhập API trả phí của bạn vào mục Settings (Cài Đặt) ở giao diện chính để tiếp tục.")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 @app.post("/api/extract/file")
 def extract_file(file: UploadFile = File(...), x_gemini_api_key: Optional[str] = Header(None)):
+    if not x_gemini_api_key and file.size and file.size > 1 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Dung lượng file vượt quá giới hạn 1MB của API miễn phí. Vui lòng nhập API trả phí của bạn vào mục Settings (Cài Đặt) ở giao diện chính để xử lý file nặng này.")
+
     file_path = os.path.join(TEMP_DIR, file.filename)
     try:
         with open(file_path, "wb") as buffer:
@@ -149,7 +155,10 @@ def extract_file(file: UploadFile = File(...), x_gemini_api_key: Optional[str] =
         
         return {"markdown": result.text, "metadata": {"file_path": result.doc_info.file_path, "title": result.doc_info.title}}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e)
+        if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+            raise HTTPException(status_code=429, detail="API miễn phí đã vượt quá hạn mức. Vui lòng nhập API trả phí của bạn vào mục Settings (Cài Đặt) ở giao diện chính để tiếp tục.")
+        raise HTTPException(status_code=500, detail=error_msg)
     finally:
         if os.path.exists(file_path):
             os.remove(file_path)
