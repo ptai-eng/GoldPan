@@ -26,7 +26,25 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                if (localStorage.getItem('theme') === 'light') {
+                  document.documentElement.classList.add('light');
+                }
+                const savedZoom = localStorage.getItem('zoomLevel');
+                if (savedZoom) {
+                  document.documentElement.style.fontSize = (parseFloat(savedZoom) * 16) + 'px';
+                }
+              } catch (e) {}
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   UploadCloud, Link as LinkIcon, Loader2, FileText, 
   X, Sparkles, LayoutTemplate, Database, 
-  Settings, ChevronRight, CheckCircle2, Download, Clock
+  Settings, ChevronRight, CheckCircle2, Download, Clock, Menu
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
@@ -20,10 +20,54 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [apiKey, setApiKey] = useState("");
   
+  // Settings State
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  const [tempApiKey, setTempApiKey] = useState("");
+  const [isKeyValid, setIsKeyValid] = useState(false);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("theme");
+    if (savedTheme === "light") {
+      setTheme("light");
+      document.documentElement.classList.add("light");
+    }
+    const savedZoom = localStorage.getItem("zoomLevel");
+    if (savedZoom) {
+      const parsedZoom = parseFloat(savedZoom);
+      setZoomLevel(parsedZoom);
+      document.documentElement.style.fontSize = `${parsedZoom * 16}px`;
+    }
+  }, []);
+
+  const changeTheme = (newTheme: "dark" | "light") => {
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    if (newTheme === "light") {
+      document.documentElement.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+    }
+  };
+
+  const changeZoom = (newZoom: number) => {
+    setZoomLevel(newZoom);
+    localStorage.setItem("zoomLevel", newZoom.toString());
+    document.documentElement.style.fontSize = `${newZoom * 16}px`;
+  };
   // Persist API Key
   useEffect(() => {
     const savedKey = localStorage.getItem("goldpan_api_key");
-    if (savedKey) setApiKey(savedKey);
+    if (savedKey) {
+      setApiKey(savedKey);
+      setTempApiKey(savedKey);
+      if (savedKey.startsWith("AIza") && savedKey.length > 30) {
+        setIsKeyValid(true);
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -33,6 +77,21 @@ export default function Home() {
       localStorage.removeItem("goldpan_api_key");
     }
   }, [apiKey]);
+
+  const handleConfirmApiKey = () => {
+    if (tempApiKey.trim() === "") {
+      setApiKey("");
+      setIsKeyValid(false);
+      return;
+    }
+    if (tempApiKey.startsWith("AIza") && tempApiKey.length > 30) {
+      setApiKey(tempApiKey);
+      setIsKeyValid(true);
+    } else {
+      alert("Invalid Gemini API Key format. It should start with 'AIza'.");
+      setIsKeyValid(false);
+    }
+  };
   
   // App views
   const [activeView, setActiveView] = useState<"extractor" | "kb">("extractor");
@@ -255,63 +314,61 @@ export default function Home() {
     : 0;
 
   return (
-    <div className="min-h-screen bg-[#000000] text-zinc-300 flex overflow-hidden selection:bg-zinc-800 selection:text-white">
+    <div className="min-h-screen bg-background text-foreground flex overflow-hidden selection:bg-accent selection:text-primary">
       
       {/* Sidebar */}
-      <aside className="w-64 border-r border-zinc-900 bg-[#050505] hidden md:flex flex-col">
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-md bg-gradient-to-tr from-zinc-700 to-zinc-900 flex items-center justify-center border border-zinc-700 shadow-lg">
-            <Sparkles className="w-4 h-4 text-white" />
+      <aside className={`border-r border-border bg-panel hidden md:flex flex-col transition-[width,opacity] duration-300 ease-in-out overflow-hidden ${isSidebarOpen ? 'w-64 opacity-100' : 'w-0 opacity-0 border-r-0'}`}>
+        <div className="w-64 flex flex-col h-full">
+          <div className="p-6 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-md bg-gradient-to-tr from-muted to-accent flex items-center justify-center border border-panel-border shadow-lg">
+            <Sparkles className="w-4 h-4 text-primary" />
           </div>
-          <span className="font-semibold text-white tracking-wide text-sm">GoldPan AI</span>
+          <span className="font-semibold text-primary tracking-wide text-sm">GoldPan AI</span>
         </div>
 
         <nav className="flex-1 px-4 py-4 flex flex-col gap-1">
-          <div className="px-3 py-2 text-xs font-medium text-zinc-600 uppercase tracking-wider mb-2">Workspace</div>
+          <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Workspace</div>
           <button 
             onClick={() => setActiveView("extractor")}
-            className={`flex items-center gap-3 px-3 py-2 text-sm w-full text-left rounded-md transition-colors ${activeView === 'extractor' ? 'bg-zinc-900/50 text-white border border-zinc-800 shadow-inner' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'}`}
+            className={`flex items-center gap-3 px-3 py-2 text-sm w-full text-left rounded-md transition-colors ${activeView === 'extractor' ? 'bg-muted/50 text-primary border border-panel-border shadow-inner' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
           >
             <LayoutTemplate className="w-4 h-4" />
             Extractor Engine
           </button>
           <button 
             onClick={() => { setActiveView("kb"); fetchKbDocuments(); }}
-            className={`flex items-center gap-3 px-3 py-2 text-sm w-full text-left rounded-md transition-colors ${activeView === 'kb' ? 'bg-zinc-900/50 text-white border border-zinc-800 shadow-inner' : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/50'}`}
+            className={`flex items-center gap-3 px-3 py-2 text-sm w-full text-left rounded-md transition-colors ${activeView === 'kb' ? 'bg-muted/50 text-primary border border-panel-border shadow-inner' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'}`}
           >
             <Database className="w-4 h-4" />
             Knowledge Base
           </button>
         </nav>
 
-        <div className="p-4 border-t border-zinc-900">
-          <div className="mb-4">
-            <label className="text-xs text-zinc-500 uppercase tracking-wider font-semibold block mb-2">Gemini API Key</label>
-            <input 
-              type="password" 
-              placeholder="AIzaSy..." 
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              className="w-full bg-[#0a0a0a] border border-zinc-800 text-zinc-300 text-xs rounded-md px-3 py-2.5 outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 transition-all font-mono"
-            />
-          </div>
-          <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm text-zinc-500 hover:text-zinc-300 rounded-md transition-colors">
+        <div className="p-4 border-t border-border">
+          <button onClick={() => setIsSettingsOpen(true)} className="w-full flex items-center gap-3 px-3 py-2 text-sm text-muted-foreground hover:text-foreground rounded-md transition-colors">
             <Settings className="w-4 h-4" />
             Settings
-          </a>
+          </button>
+          </div>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col relative h-screen overflow-hidden">
         {/* Glow Effect */}
-        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-zinc-800/20 blur-[120px] pointer-events-none" />
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-accent/20 blur-[120px] pointer-events-none" />
 
-        <header className="h-16 border-b border-zinc-900/50 flex items-center px-8 bg-[#000000]/80 backdrop-blur-md z-10">
-          <div className="flex items-center gap-2 text-sm text-zinc-500">
+        <header className="h-16 border-b border-border/50 flex items-center px-4 bg-background/80 backdrop-blur-md z-10 gap-4">
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Workspace</span>
             <ChevronRight className="w-4 h-4" />
-            <span className="text-zinc-300">{activeView === 'extractor' ? 'Data Cleansing Pipeline' : 'Knowledge Base Chat'}</span>
+            <span className="text-foreground">{activeView === 'extractor' ? 'Data Cleansing Pipeline' : 'Knowledge Base Chat'}</span>
           </div>
         </header>
 
@@ -319,25 +376,25 @@ export default function Home() {
           {activeView === "extractor" ? (
             <>
               {/* Left Panel: Controls */}
-              <div className="w-full lg:w-1/3 border-r border-zinc-900/50 bg-[#050505]/30 p-8 overflow-y-auto flex flex-col gap-8 z-10">
+              <div className="w-full lg:w-1/3 border-r border-border/50 bg-panel/30 p-8 overflow-y-auto flex flex-col gap-8 z-10">
                 
                 <div>
-                  <h1 className="text-2xl font-semibold text-white mb-2">Extract Content</h1>
-                  <p className="text-sm text-zinc-500 leading-relaxed">
+                  <h1 className="text-2xl font-semibold text-primary mb-2">Extract Content</h1>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     Transform noisy PDFs and raw HTML into clean, AI-ready Markdown.
                   </p>
                 </div>
 
-                <div className="bg-[#0a0a0a] border border-zinc-800/80 rounded-xl p-1 flex shadow-sm">
+                <div className="bg-panel border border-panel-border/80 rounded-xl p-1 flex shadow-sm">
                   <button 
                     onClick={() => setActiveTab("file")}
-                    className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === 'file' ? 'bg-zinc-800 text-white shadow-md border border-zinc-700/50' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition duration-200 ${activeTab === 'file' ? 'bg-accent text-primary shadow-md border border-panel-border/50' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     Document
                   </button>
                   <button 
                     onClick={() => setActiveTab("url")}
-                    className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === 'url' ? 'bg-zinc-800 text-white shadow-md border border-zinc-700/50' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition duration-200 ${activeTab === 'url' ? 'bg-accent text-primary shadow-md border border-panel-border/50' : 'text-muted-foreground hover:text-foreground'}`}
                   >
                     Web Link
                   </button>
@@ -357,10 +414,10 @@ export default function Home() {
                         onDragLeave={handleDragLeave}
                         onDrop={handleDrop}
                         onClick={() => fileInputRef.current?.click()}
-                        className={`relative overflow-hidden border border-dashed rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all duration-300 ${
+                        className={`relative overflow-hidden border border-dashed rounded-2xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition duration-300 ${
                           isDragging 
-                            ? "border-zinc-500 bg-zinc-900/80 shadow-[0_0_30px_rgba(255,255,255,0.05)]" 
-                            : "border-zinc-800 bg-[#0a0a0a] hover:bg-[#0f0f11] hover:border-zinc-700"
+                            ? "border-zinc-500 bg-muted/80 shadow-[0_0_30px_rgba(255,255,255,0.05)]" 
+                            : "border-panel-border bg-panel hover:bg-[#0f0f11] hover:border-panel-border"
                         } ${file ? "border-green-500/30 bg-green-950/20" : ""}`}
                       >
                         <input 
@@ -375,16 +432,16 @@ export default function Home() {
                             <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center mb-4 border border-green-500/20">
                               <CheckCircle2 className="w-6 h-6 text-green-500" />
                             </div>
-                            <p className="text-white font-medium text-sm">{file.name}</p>
-                            <p className="text-zinc-500 text-xs mt-1.5 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                            <p className="text-primary font-medium text-sm">{file.name}</p>
+                            <p className="text-muted-foreground text-xs mt-1.5 font-mono">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                           </motion.div>
                         ) : (
                           <>
-                            <div className="w-12 h-12 bg-zinc-900 rounded-full flex items-center justify-center mb-4 border border-zinc-800">
-                              <UploadCloud className="w-5 h-5 text-zinc-400" />
+                            <div className="w-12 h-12 bg-muted rounded-full flex items-center justify-center mb-4 border border-panel-border">
+                              <UploadCloud className="w-5 h-5 text-muted-foreground" />
                             </div>
-                            <p className="text-zinc-300 font-medium text-sm">Click or drag document here</p>
-                            <p className="text-zinc-600 text-xs mt-2 font-medium tracking-wide">PDF, DOCX, TXT, JPG, MP3</p>
+                            <p className="text-foreground font-medium text-sm">Click or drag document here</p>
+                            <p className="text-muted-foreground text-xs mt-2 font-medium tracking-wide">PDF, DOCX, TXT, JPG, MP3</p>
                           </>
                         )}
                       </div>
@@ -392,7 +449,7 @@ export default function Home() {
                       <button 
                         onClick={processFile}
                         disabled={!file || status === "loading"}
-                        className="group relative w-full bg-white text-black font-semibold py-3.5 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center overflow-hidden hover:bg-zinc-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+                        className="group relative w-full bg-white text-black font-semibold py-3.5 rounded-xl transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center overflow-hidden hover:bg-zinc-200 shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]"
                       >
                         {status === "loading" ? (
                           <Loader2 className="w-5 h-5 animate-spin" />
@@ -411,15 +468,15 @@ export default function Home() {
                       exit={{ opacity: 0, y: -5 }}
                       className="flex flex-col gap-6"
                     >
-                      <div className="bg-[#0a0a0a] border border-zinc-800 rounded-xl overflow-hidden focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-600 transition-all">
+                      <div className="bg-panel border border-panel-border rounded-xl overflow-hidden focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-600 transition">
                         <div className="flex items-center gap-3 p-4">
-                          <LinkIcon className="w-4 h-4 text-zinc-500" />
+                          <LinkIcon className="w-4 h-4 text-muted-foreground" />
                           <input 
                             type="url" 
                             placeholder="https://example.com/article" 
                             value={url}
                             onChange={(e) => setUrl(e.target.value)}
-                            className="bg-transparent border-none outline-none text-sm text-white w-full placeholder:text-zinc-600 font-mono"
+                            className="bg-transparent border-none outline-none text-sm text-primary w-full placeholder:text-muted-foreground font-mono"
                           />
                         </div>
                       </div>
@@ -427,7 +484,7 @@ export default function Home() {
                       <button 
                         onClick={processUrl}
                         disabled={!url || status === "loading"}
-                        className="group relative w-full bg-white text-black font-semibold py-3.5 rounded-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center overflow-hidden hover:bg-zinc-200"
+                        className="group relative w-full bg-white text-black font-semibold py-3.5 rounded-xl transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center overflow-hidden hover:bg-zinc-200"
                       >
                         {status === "loading" ? (
                           <Loader2 className="w-5 h-5 animate-spin" />
@@ -454,17 +511,17 @@ export default function Home() {
               </div>
 
           {/* Right Panel: Output */}
-          <div className="flex-1 bg-[#050505] p-8 overflow-y-auto relative z-10 flex flex-col">
-            <div className="flex-1 border border-zinc-900 bg-[#0a0a0a]/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-sm">
-              <div className="h-14 border-b border-zinc-900 flex items-center justify-between px-4 bg-[#0a0a0a]">
+          <div className="flex-1 bg-panel p-8 overflow-y-auto relative z-10 flex flex-col">
+            <div className="flex-1 border border-border bg-panel/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-sm">
+              <div className="h-14 border-b border-border flex items-center justify-between px-4 bg-panel">
                 <div className="flex items-center gap-4">
                   <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-zinc-800"></div>
-                    <div className="w-3 h-3 rounded-full bg-zinc-800"></div>
-                    <div className="w-3 h-3 rounded-full bg-zinc-800"></div>
+                    <div className="w-3 h-3 rounded-full bg-accent"></div>
+                    <div className="w-3 h-3 rounded-full bg-accent"></div>
+                    <div className="w-3 h-3 rounded-full bg-accent"></div>
                   </div>
-                  <div className="w-px h-5 bg-zinc-800 mx-1"></div>
-                  <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider font-semibold">Markdown Output</span>
+                  <div className="w-px h-5 bg-accent mx-1"></div>
+                  <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider font-semibold">Markdown Output</span>
                 </div>
                 
                 {/* Actions: Download & Clear */}
@@ -473,21 +530,21 @@ export default function Home() {
                     <button 
                       onClick={saveToKb} 
                       disabled={isSavingKb}
-                      className="flex items-center gap-2 text-white hover:text-black hover:bg-white transition-colors text-xs font-semibold bg-blue-900/50 px-3 py-1.5 rounded-md border border-blue-700 disabled:opacity-50"
+                      className="flex items-center gap-2 text-primary hover:text-black hover:bg-white transition-colors text-xs font-semibold bg-blue-900/50 px-3 py-1.5 rounded-md border border-blue-700 disabled:opacity-50"
                     >
                       {isSavingKb ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
                       Save to KB
                     </button>
                     <button 
                       onClick={downloadMarkdown} 
-                      className="flex items-center gap-2 text-white hover:text-black hover:bg-white transition-colors text-xs font-semibold bg-zinc-800 px-3 py-1.5 rounded-md border border-zinc-700"
+                      className="flex items-center gap-2 text-primary hover:text-black hover:bg-white transition-colors text-xs font-semibold bg-accent px-3 py-1.5 rounded-md border border-panel-border"
                     >
                       <Download className="w-3.5 h-3.5" />
                       Download MD
                     </button>
                     <button 
                       onClick={reset} 
-                      className="text-zinc-500 hover:text-red-400 transition-colors"
+                      className="text-muted-foreground hover:text-red-400 transition-colors"
                       title="Clear Workspace"
                     >
                       <X className="w-5 h-5" />
@@ -498,21 +555,21 @@ export default function Home() {
 
               <div className="p-8 flex-1 overflow-y-auto font-sans">
                 {status === "idle" && (
-                  <div className="h-full flex flex-col items-center justify-center text-zinc-600 gap-4">
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-4">
                     <FileText className="w-12 h-12 opacity-20" />
                     <p className="text-sm font-medium tracking-wide">Ready to extract some gold.</p>
                   </div>
                 )}
                 
                 {status === "loading" && (
-                  <div className="h-full flex flex-col items-center justify-center gap-8 text-zinc-400 w-full max-w-md mx-auto">
+                  <div className="h-full flex flex-col items-center justify-center gap-8 text-muted-foreground w-full max-w-md mx-auto">
                     
                     <div className="flex flex-col items-center gap-2 relative">
-                      <Clock className="w-8 h-8 text-zinc-500 mb-2 animate-pulse" />
-                      <div className="text-3xl font-mono text-white font-light tracking-widest">
+                      <Clock className="w-8 h-8 text-muted-foreground mb-2 animate-pulse" />
+                      <div className="text-3xl font-mono text-primary font-light tracking-widest">
                         {formatTime(remainingSeconds)}
                       </div>
-                      <p className="text-xs text-zinc-500 uppercase tracking-widest">Estimated Time Remaining</p>
+                      <p className="text-xs text-muted-foreground uppercase tracking-widest">Estimated Time Remaining</p>
                       
                       <AnimatePresence>
                         {remainingSeconds === 1 && (
@@ -530,7 +587,7 @@ export default function Home() {
 
                     {/* Progress Bar UI */}
                     <div className="w-full flex flex-col gap-2 mt-4">
-                      <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                         <motion.div 
                           className="h-full bg-white rounded-full"
                           initial={{ width: "0%" }}
@@ -538,7 +595,7 @@ export default function Home() {
                           transition={{ ease: "linear", duration: 1 }}
                         />
                       </div>
-                      <div className="flex justify-between text-xs font-mono text-zinc-600">
+                      <div className="flex justify-between text-xs font-mono text-muted-foreground">
                         <span>Extracting text...</span>
                         <span>{Math.round(progressPercent)}%</span>
                       </div>
@@ -563,50 +620,50 @@ export default function Home() {
           ) : (
             <>
               {/* Left Panel: List of Docs in KB */}
-              <div className="w-full lg:w-1/3 border-r border-zinc-900/50 bg-[#050505]/30 p-8 overflow-y-auto flex flex-col gap-8 z-10">
+              <div className="w-full lg:w-1/3 border-r border-border/50 bg-panel/30 p-8 overflow-y-auto flex flex-col gap-8 z-10">
                 <div>
-                  <h1 className="text-2xl font-semibold text-white mb-2">Knowledge Base</h1>
-                  <p className="text-sm text-zinc-500 leading-relaxed">
+                  <h1 className="text-2xl font-semibold text-primary mb-2">Knowledge Base</h1>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     Documents available for AI querying.
                   </p>
                 </div>
 
                 <div className="flex flex-col gap-3">
                   {kbDocuments.length === 0 ? (
-                    <div className="text-zinc-600 text-sm italic">No documents found. Extract something and click 'Save to KB'.</div>
+                    <div className="text-muted-foreground text-sm italic">No documents found. Extract something and click 'Save to KB'.</div>
                   ) : (
                     kbDocuments.map((doc, idx) => (
-                      <div key={idx} className="bg-[#0a0a0a] border border-zinc-800 p-4 rounded-xl flex items-start gap-3 hover:border-zinc-700 transition-colors">
-                        <FileText className="w-5 h-5 text-zinc-500 mt-0.5 shrink-0" />
+                      <div key={idx} className="bg-panel border border-panel-border p-4 rounded-xl flex items-start gap-3 hover:border-panel-border transition-colors">
+                        <FileText className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
                         <div>
-                          <p className="text-sm font-medium text-zinc-300 line-clamp-1">{doc.title}</p>
-                          <p className="text-xs text-zinc-600 mt-1 line-clamp-1 font-mono">{doc.source}</p>
+                          <p className="text-sm font-medium text-foreground line-clamp-1">{doc.title}</p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-1 font-mono">{doc.source}</p>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
                 
-                <button onClick={fetchKbDocuments} className="text-xs text-zinc-500 hover:text-zinc-300 text-left underline underline-offset-2">Refresh List</button>
+                <button onClick={fetchKbDocuments} className="text-xs text-muted-foreground hover:text-foreground text-left underline underline-offset-2">Refresh List</button>
               </div>
 
               {/* Right Panel: Chat UI */}
-              <div className="flex-1 bg-[#050505] p-8 relative z-10 flex flex-col">
-                <div className="flex-1 border border-zinc-900 bg-[#0a0a0a]/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-sm">
-                  <div className="h-14 border-b border-zinc-900 flex items-center justify-between px-4 bg-[#0a0a0a]">
-                    <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider font-semibold">GoldPan AI Assistant</span>
+              <div className="flex-1 bg-panel p-8 relative z-10 flex flex-col">
+                <div className="flex-1 border border-border bg-panel/50 rounded-2xl shadow-2xl flex flex-col overflow-hidden backdrop-blur-sm">
+                  <div className="h-14 border-b border-border flex items-center justify-between px-4 bg-panel">
+                    <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider font-semibold">GoldPan AI Assistant</span>
                   </div>
 
                   <div className="flex-1 p-6 overflow-y-auto flex flex-col gap-6 font-sans">
                     {chatHistory.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-zinc-600 gap-4">
+                      <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-4">
                         <Sparkles className="w-12 h-12 opacity-20" />
                         <p className="text-sm font-medium tracking-wide">Ask anything about your Knowledge Base.</p>
                       </div>
                     ) : (
                       chatHistory.map((msg, idx) => (
                         <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                          <div className={`max-w-[80%] rounded-2xl px-5 py-3.5 ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200' : 'bg-transparent border border-zinc-800 text-zinc-300'}`}>
+                          <div className={`max-w-[80%] rounded-2xl px-5 py-3.5 ${msg.role === 'user' ? 'bg-accent text-foreground' : 'bg-transparent border border-panel-border text-foreground'}`}>
                             {msg.role === 'user' ? (
                               msg.content
                             ) : (
@@ -620,14 +677,14 @@ export default function Home() {
                     )}
                     {isChatLoading && (
                       <div className="flex justify-start">
-                        <div className="max-w-[80%] rounded-2xl px-5 py-3.5 bg-transparent border border-zinc-800 text-zinc-500 flex items-center gap-2">
+                        <div className="max-w-[80%] rounded-2xl px-5 py-3.5 bg-transparent border border-panel-border text-muted-foreground flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin" /> Thinking...
                         </div>
                       </div>
                     )}
                   </div>
                   
-                  <div className="p-4 border-t border-zinc-900 bg-[#0a0a0a]">
+                  <div className="p-4 border-t border-border bg-panel">
                     <div className="relative">
                       <input 
                         type="text"
@@ -635,12 +692,12 @@ export default function Home() {
                         onChange={e => setChatInput(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleSendChat()}
                         placeholder="Ask a question..."
-                        className="w-full bg-[#111] border border-zinc-800 text-sm text-white rounded-xl pl-4 pr-12 py-3.5 outline-none focus:border-zinc-600 transition-all"
+                        className="w-full bg-panel border border-panel-border text-sm text-primary rounded-xl pl-4 pr-12 py-3.5 outline-none focus:border-zinc-600 transition"
                       />
                       <button 
                         onClick={handleSendChat}
                         disabled={!chatInput.trim() || isChatLoading}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-zinc-800 rounded-lg text-white disabled:opacity-50 hover:bg-zinc-700"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center bg-accent rounded-lg text-primary disabled:opacity-50 hover:bg-accent"
                       >
                         <ChevronRight className="w-4 h-4" />
                       </button>
@@ -653,6 +710,97 @@ export default function Home() {
           
         </div>
       </main>
+
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-panel border border-border w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
+            >
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-panel">
+                <h2 className="text-lg font-semibold text-primary">Preferences</h2>
+                <button 
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="p-1 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 flex flex-col gap-6 bg-panel">
+                
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-foreground">Gemini API Key</label>
+                  <p className="text-xs text-muted-foreground mb-1">Enter your API key to enable extraction and AI chat.</p>
+                  <div className="flex gap-2">
+                    <input 
+                      type="password" 
+                      placeholder="AIzaSy..." 
+                      value={tempApiKey}
+                      onChange={(e) => {
+                        setTempApiKey(e.target.value);
+                        if (e.target.value !== apiKey) setIsKeyValid(false);
+                      }}
+                      className="flex-1 bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-zinc-500 font-mono"
+                    />
+                    <button 
+                      onClick={handleConfirmApiKey}
+                      className="px-4 py-2 bg-accent text-accent-foreground text-sm font-medium rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+                    >
+                      {isKeyValid ? <CheckCircle2 className="w-4 h-4 text-green-500" /> : "Confirm"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-foreground">Theme</label>
+                  <p className="text-xs text-muted-foreground mb-1">Select your theme preference.</p>
+                  <select 
+                    value={theme}
+                    onChange={(e) => changeTheme(e.target.value as "light" | "dark")}
+                    className="w-full bg-muted border border-border rounded-lg px-3 py-2 text-sm text-foreground outline-none focus:border-zinc-500"
+                  >
+                    <option value="light">☀️ Light</option>
+                    <option value="dark">🌙 Dark</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-foreground">Size (Zoom)</label>
+                  <p className="text-xs text-muted-foreground mb-1">Adjust the overall scale of the application.</p>
+                  <select 
+                    value={zoomLevel}
+                    onChange={(e) => changeZoom(parseFloat(e.target.value))}
+                    className="w-full bg-panel border border-border text-sm text-foreground rounded-lg px-3 py-2.5 outline-none focus:border-zinc-500 transition-colors"
+                  >
+                    <option value={0.75}>Small (75%)</option>
+                    <option value={1}>Default (100%)</option>
+                    <option value={1.25}>Big (125%)</option>
+                  </select>
+                </div>
+
+              </div>
+              <div className="bg-muted border-t border-border px-6 py-4 flex justify-end">
+                <button 
+                  onClick={() => setIsSettingsOpen(false)}
+                  className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-lg hover:opacity-90 transition-opacity"
+                >
+                  Save & Close
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 }
