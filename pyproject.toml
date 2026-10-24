@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "goldpan"
+version = "2.0.0"
+description = "Privacy-First Multimodal Data Refinery, Dual-Mode Local ONNX RAG & Model Context Protocol (MCP) Server"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Hoang Kim Phat Tai", email = "phattai09052006@gmail.com" }
+]
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "pydantic>=2.8.0",
+    "python-multipart>=0.0.9",
+    "python-dotenv>=1.0.1",
+    "markitdown>=0.1.6",
+    "pdfplumber>=0.11.0",
+    "trafilatura>=2.0.0",
+    "beautifulsoup4>=4.12.0",
+    "playwright>=1.45.0",
+    "youtube-transcript-api>=1.0.0",
+    "chromadb>=1.0.0",
+    "onnxruntime>=1.19.0",
+    "google-genai>=1.0.0",
+    "Pillow>=10.0.0",
+    "requests>=2.32.0",
+    "typer>=0.12.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+goldpan = "goldpan.cli:app"
+goldpan-mcp = "goldpan.mcp_server:main"
+
+[tool.setuptools]
+package-dir = {"" = "backend"}
+
+[tool.setuptools.packages.find]
+where = ["backend"]
+include = ["goldpan*"]

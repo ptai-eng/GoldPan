@@ -1,7 +1,24 @@
+# Python & Virtual Environments
 venv/
+backend/venv/
+.venv/
 __pycache__/
-*.pyc
-.env
+*.py[cod]
 .pytest_cache/
+
+# Local Vector DB & Knowledge Base Storage
+chroma_data/
 backend/chroma_data/
-KB/
+KB/*.md
+!KB/.gitkeep
+
+# Temporary Uploads & Environment Secrets
+temp_uploads/
+backend/temp_uploads/
+.env
+backend/.env
+
+# Frontend Build & Dependencies
+frontend/node_modules/
+frontend/.next/
+frontend/out/

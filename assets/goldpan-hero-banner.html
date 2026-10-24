@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoldPan AI · Hero Banner</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0C0A09;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    svg { display: block; width: 1280px; height: 420px; }
+  </style>
+</head>
+<body>
+  <svg viewBox="0 0 1280 420" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="goldpan-banner-title goldpan-banner-desc">
+    <title id="goldpan-banner-title">GoldPan AI — Privacy-First Multimodal Data Refinery and Local RAG Workspace</title>
+    <desc id="goldpan-banner-desc">Hero banner for GoldPan AI featuring Dark Stone and Gold editorial typography, universal ingestion badges, and dual-mode ONNX and Gemini vector pipeline metrics.</desc>
+    <defs>
+      <pattern id="grid-dots" width="24" height="24" patternUnits="userSpaceOnUse">
+        <circle cx="2" cy="2" r="1" fill="rgba(250,204,21,0.10)"/>
+      </pattern>
+      <radialGradient id="gold-glow" cx="78%" cy="48%" r="48%">
+        <stop offset="0%" stop-color="rgba(250,204,21,0.16)"/>
+        <stop offset="55%" stop-color="rgba(250,204,21,0.04)"/>
+        <stop offset="100%" stop-color="rgba(12,10,9,0)"/>
+      </radialGradient>
+      <linearGradient id="card-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#1C1917"/>
+        <stop offset="100%" stop-color="#131110"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Base Canvas -->
+    <rect width="1280" height="420" rx="16" fill="#0C0A09"/>
+    <rect width="1280" height="420" rx="16" fill="url(#grid-dots)"/>
+    <rect width="1280" height="420" rx="16" fill="url(#gold-glow)"/>
+    <rect x="1" y="1" width="1278" height="418" rx="15" fill="none" stroke="#292524" stroke-width="2"/>
+
+    <!-- Top Status Strip -->
+    <rect x="64" y="48" width="12" height="12" rx="6" fill="#FACC15"/>
+    <text x="88" y="58" fill="#FACC15" font-size="11" font-weight="600" font-family="'Geist Mono', monospace" letter-spacing="0.20em">GOLDPAN AI · V2.0 DUAL-MODE ENGINE</text>
+    <line x1="392" y1="54" x2="720" y2="54" stroke="rgba(245,245,244,0.12)" stroke-width="1"/>
+
+    <!-- Main Editorial Headline -->
+    <text x="64" y="144" fill="#F5F5F4" font-size="72" font-weight="400" font-family="'Instrument Serif', serif" letter-spacing="-0.02em">GoldPan <tspan fill="#FACC15" font-style="italic">AI</tspan></text>
+
+    <text x="64" y="192" fill="#E7E5E4" font-size="20" font-weight="500" font-family="'Geist', sans-serif">
+      Privacy-First Multimodal Data Refinery &amp; Local RAG Workspace
+    </text>
+    <text x="64" y="226" fill="#A8A29E" font-size="14" font-weight="400" font-family="'Geist', sans-serif">
+      Sift pure, structured Markdown and high-precision embeddings from noisy PDFs, Office docs,
+    </text>
+    <text x="64" y="248" fill="#A8A29E" font-size="14" font-weight="400" font-family="'Geist', sans-serif">
+      dynamic web pages, YouTube transcripts, audio recordings, and high-resolution imagery.
+    </text>
+
+    <!-- Bottom Capability Pills (Left) -->
+    <rect x="64" y="292" width="188" height="36" rx="8" fill="#1C1917" stroke="#292524" stroke-width="1"/>
+    <circle cx="84" cy="310" r="4" fill="#10B981"/>
+    <text x="98" y="314" fill="#F5F5F4" font-size="11" font-weight="500" font-family="'Geist Mono', monospace">100% OFFLINE ONNX</text>
+
+    <rect x="268" y="292" width="196" height="36" rx="8" fill="#1C1917" stroke="#292524" stroke-width="1"/>
+    <circle cx="288" cy="310" r="4" fill="#FACC15"/>
+    <text x="302" y="314" fill="#F5F5F4" font-size="11" font-weight="500" font-family="'Geist Mono', monospace">GEMINI 2.5 TURBO</text>
+
+    <rect x="480" y="292" width="212" height="36" rx="8" fill="#1C1917" stroke="#292524" stroke-width="1"/>
+    <circle cx="500" cy="310" r="4" fill="#60A5FA"/>
+    <text x="514" y="314" fill="#F5F5F4" font-size="11" font-weight="500" font-family="'Geist Mono', monospace">CHROMA + KB/*.MD</text>
+
+    <!-- Bottom Tech Footer -->
+    <text x="64" y="368" fill="#78716C" font-size="11" font-family="'Geist Mono', monospace" letter-spacing="0.08em">
+      FASTAPI · NEXT.JS 16 · REACT 19 · MARKITDOWN · TRAFILATURA · PLAYWRIGHT · CHROMADB
+    </text>
+
+    <!-- Right Interactive Refinery Card Schematic -->
+    <rect x="768" y="52" width="448" height="316" rx="12" fill="url(#card-grad)" stroke="#292524" stroke-width="1.5"/>
+
+    <!-- Window Header -->
+    <circle cx="792" cy="76" r="5" fill="#44403C"/>
+    <circle cx="808" cy="76" r="5" fill="#44403C"/>
+    <circle cx="824" cy="76" r="5" fill="#FACC15"/>
+    <text x="848" y="80" fill="#A8A29E" font-size="10" font-family="'Geist Mono', monospace" letter-spacing="0.12em">REFINERY TELEMETRY · LIVE PIPELINE</text>
+    <line x1="768" y1="96" x2="1216" y2="96" stroke="#292524" stroke-width="1"/>
+
+    <!-- Stage Row 1: Raw Input -->
+    <rect x="796" y="116" width="392" height="56" rx="8" fill="#0C0A09" stroke="#292524" stroke-width="1"/>
+    <rect x="812" y="132" width="48" height="24" rx="4" fill="rgba(245,245,244,0.06)" stroke="rgba(245,245,244,0.20)" stroke-width="1"/>
+    <text x="836" y="148" fill="#E7E5E4" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">RAW</text>
+    <text x="876" y="140" fill="#F5F5F4" font-size="13" font-weight="600" font-family="'Geist', sans-serif">Unstructured Multi-Format Stream</text>
+    <text x="876" y="158" fill="#78716C" font-size="10" font-family="'Geist Mono', monospace">PDF · DOCX · CSV · HTML · YouTube · Audio · EXIF</text>
+
+    <!-- Connector Down 1 -->
+    <line x1="992" y1="172" x2="992" y2="192" stroke="#FACC15" stroke-width="1.5"/>
+
+    <!-- Stage Row 2: Refinery Sieve -->
+    <rect x="796" y="192" width="392" height="56" rx="8" fill="rgba(250,204,21,0.07)" stroke="#FACC15" stroke-width="1.2"/>
+    <rect x="812" y="208" width="48" height="24" rx="4" fill="rgba(250,204,21,0.18)" stroke="#FACC15" stroke-width="1"/>
+    <text x="836" y="224" fill="#FACC15" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">SIFT</text>
+    <text x="876" y="216" fill="#F5F5F4" font-size="13" font-weight="600" font-family="'Geist', sans-serif">Heuristic + 10-Thread Semantic Router</text>
+    <text x="876" y="234" fill="#FACC15" font-size="10" font-family="'Geist Mono', monospace">Strips ads &amp; boilerplate · Keeps tables intact</text>
+
+    <!-- Connector Down 2 -->
+    <line x1="992" y1="248" x2="992" y2="268" stroke="#FACC15" stroke-width="1.5"/>
+
+    <!-- Stage Row 3: Dual-Mode KB Output -->
+    <rect x="796" y="268" width="392" height="72" rx="8" fill="#0C0A09" stroke="#292524" stroke-width="1"/>
+    <rect x="812" y="292" width="48" height="24" rx="4" fill="rgba(16,185,129,0.15)" stroke="#10B981" stroke-width="1"/>
+    <text x="836" y="308" fill="#10B981" font-size="10" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">GOLD</text>
+    <text x="876" y="294" fill="#F5F5F4" font-size="13" font-weight="600" font-family="'Geist', sans-serif">AI-Ready Markdown &amp; Vector Store</text>
+    <text x="876" y="312" fill="#A8A29E" font-size="10" font-family="'Geist Mono', monospace">Local: ONNX all-MiniLM-L6-v2 (384d, 0 API keys)</text>
+    <text x="876" y="328" fill="#A8A29E" font-size="10" font-family="'Geist Mono', monospace">Cloud: Gemini Embedding 001 + Backoff Guard</text>
+  </svg>
+</body>
+</html>

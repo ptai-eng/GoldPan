@@ -197,8 +197,8 @@ export default function Home() {
   const processFile = async () => {
     if (!file) return;
     
-    if (file.size > 1024 * 1024 && !apiKey) {
-      alert("Dung lượng file vượt quá giới hạn 1MB của API miễn phí.\n\nVui lòng nhập API trả phí của bạn vào mục Settings (Cài Đặt) ở giao diện chính để xử lý file nặng này.");
+    if (file.size > 5 * 1024 * 1024 && !apiKey) {
+      alert("Dung lượng file vượt quá giới hạn 5MB ở chế độ Offline mặc định.\n\nVui lòng nhập Gemini API Key vào mục Settings (Cài Đặt) để xử lý file lớn hơn.");
       return;
     }
     
@@ -387,18 +387,30 @@ export default function Home() {
         {/* Glow Effect */}
         <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-accent/20 blur-[120px] pointer-events-none" />
 
-        <header className="h-16 border-b border-border/50 flex items-center px-4 bg-background/80 backdrop-blur-md z-10 gap-4">
-          <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span>Workspace</span>
-            <ChevronRight className="w-4 h-4" />
-            <span className="text-foreground">{activeView === 'extractor' ? 'Data Cleansing Pipeline' : 'Knowledge Base Chat'}</span>
+        <header className="h-16 border-b border-border/50 flex items-center justify-between px-4 bg-background/80 backdrop-blur-md z-10 gap-4">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-md transition-colors"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>Workspace</span>
+              <ChevronRight className="w-4 h-4" />
+              <span className="text-foreground">{activeView === 'extractor' ? 'Data Cleansing Pipeline' : 'Knowledge Base Chat'}</span>
+            </div>
           </div>
+          <button
+            onClick={() => setIsSettingsOpen(true)}
+            className="text-xs font-mono px-3 py-1.5 rounded-full border border-panel-border bg-panel hover:bg-muted transition-colors flex items-center gap-2"
+            title="Click to configure Engine Mode & API Key"
+          >
+            <span className={`w-2 h-2 rounded-full ${apiKey ? 'bg-primary' : 'bg-emerald-500'}`} />
+            <span className="text-muted-foreground">
+              {apiKey ? 'Gemini 2.5 Turbo + Cloud KB' : 'Local ONNX Offline Mode'}
+            </span>
+          </button>
         </header>
 
         <div className="flex-1 flex overflow-hidden">
@@ -551,6 +563,16 @@ export default function Home() {
                   </div>
                   <div className="w-px h-5 bg-accent mx-1"></div>
                   <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider font-semibold">Markdown Output</span>
+                  {result?.metadata?.stats && (
+                    <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] font-mono text-amber-400/90 bg-amber-950/30 border border-amber-900/40 px-2.5 py-0.5 rounded-full">
+                      <span>
+                        Stripped {(
+                          (result.metadata.stats.heuristic_noise_removed_bytes || 0) +
+                          (result.metadata.stats.semantic_noise_removed_bytes || 0)
+                        ).toLocaleString()} B noise
+                      </span>
+                    </span>
+                  )}
                 </div>
                 
                 {/* Actions: Download & Clear */}
@@ -668,6 +690,9 @@ export default function Home() {
                           <div className="overflow-hidden">
                             <p className="text-sm font-medium text-foreground line-clamp-1" title={doc.title}>{doc.title}</p>
                             <p className="text-xs text-muted-foreground mt-1 line-clamp-1 font-mono" title={doc.source}>{doc.source}</p>
+                            <span className="inline-block mt-1.5 text-[10px] font-mono px-2 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                              {doc.embedding_mode === "gemini_api" ? "Gemini 768d" : "Local ONNX 384d"}
+                            </span>
                           </div>
                         </div>
                         <button onClick={() => deleteDocument(doc.id)} className="text-muted-foreground hover:text-red-500 transition shrink-0 p-1" title="Delete from Knowledge Base">

@@ -1,83 +1,137 @@
+import re
+from urllib.parse import urlparse
 import requests
 import trafilatura
 from bs4 import BeautifulSoup
-import re
 from goldpan.core.schemas import RawContent, DocumentInfo
+
+DEFAULT_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/131.0.0.0 Safari/537.36 GoldPanAI/2.0"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+}
+
+YOUTUBE_ID_PATTERN = re.compile(
+    r"(?:v=|youtu\.be/|/embed/|/shorts/|/v/)([0-9A-Za-z_-]{11})(?:[^0-9A-Za-z_-]|$)"
+)
+
 
 class HybridWebExtractor:
     def __init__(self, use_playwright_fallback: bool = True):
         self.use_playwright_fallback = use_playwright_fallback
 
-    def _extract_youtube_id(self, url: str) -> str:
-        match = re.search(r"(?:v=|\/)([0-9A-Za-z_-]{11}).*", url)
+    def _validate_url(self, url: str) -> str:
+        parsed = urlparse(url.strip())
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError(f"Invalid URL scheme or host: {url}")
+        host = (parsed.hostname or "").lower()
+        if host in ("169.254.169.254", "metadata.google.internal"):
+            raise ValueError("Blocked cloud metadata endpoint.")
+        return url.strip()
+
+    def _extract_youtube_id(self, url: str) -> str | None:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        if not ("youtube.com" in host or "youtu.be" in host):
+            return None
+        match = YOUTUBE_ID_PATTERN.search(url)
         return match.group(1) if match else None
 
     def _extract_youtube(self, url: str, video_id: str) -> RawContent:
         try:
             from youtube_transcript_api import YouTubeTranscriptApi
+
             ytt_api = YouTubeTranscriptApi()
             transcript_list = ytt_api.list(video_id)
-            transcript = transcript_list.find_transcript(['en', 'vi'])
+            try:
+                transcript = transcript_list.find_transcript(["en", "vi"])
+            except Exception:
+                # Fallback to first available transcript in any language
+                transcript = next(iter(transcript_list))
             data = transcript.fetch()
-            text = "\n".join([getattr(t, 'text', str(t)) for t in data])
+            text = "\n".join([getattr(t, "text", str(t)) for t in data])
             doc_info = DocumentInfo(source_url=url, title=f"YouTube Video - {video_id}")
             return RawContent(text=text, doc_info=doc_info, original_format="youtube")
         except Exception as e:
             raise ValueError(f"Could not extract YouTube transcript: {str(e)}")
 
     def extract(self, url: str) -> RawContent:
+        url = self._validate_url(url)
+
         yt_id = self._extract_youtube_id(url)
-        if yt_id and "youtube.com" in url or "youtu.be" in url:
+        if yt_id:
             return self._extract_youtube(url, yt_id)
 
-        # Basic Github blob to raw conversion
+        # Basic GitHub blob to raw conversion
         if "github.com" in url and "/blob/" in url:
             url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
 
-        # Step 1: Try fast requests
+        html = ""
+        soup = None
+
+        # Step 1: Try fast HTTP request with browser User-Agent
         try:
-            response = requests.get(url, timeout=10)
+            response = requests.get(url, headers=DEFAULT_HEADERS, timeout=12)
             response.raise_for_status()
             html = response.text
-            
-            # Simple heuristic to detect if page is mostly empty / requires JS
-            soup = BeautifulSoup(html, 'html.parser')
+            soup = BeautifulSoup(html, "html.parser")
             text_len = len(soup.get_text(strip=True))
-            
+
             if text_len < 500 and self.use_playwright_fallback:
-                html = self._extract_with_playwright(url)
-                
-        except Exception as e:
+                pw_html = self._extract_with_playwright(url)
+                if pw_html:
+                    html = pw_html
+                    soup = BeautifulSoup(html, "html.parser")
+        except Exception as req_err:
             if self.use_playwright_fallback:
-                html = self._extract_with_playwright(url)
+                pw_html = self._extract_with_playwright(url)
+                if not pw_html:
+                    raise req_err
+                html = pw_html
+                soup = BeautifulSoup(html, "html.parser")
             else:
-                raise e
-                
-        # Trafilatura can extract main content from HTML natively
-        extracted_text = trafilatura.extract(html, include_links=True, include_images=True, include_tables=True)
-        
-        # Fallback if trafilatura fails
+                raise req_err
+
+        # Step 2: Extract main content via Trafilatura
+        extracted_text = trafilatura.extract(
+            html,
+            include_links=True,
+            include_images=True,
+            include_tables=True,
+        )
+
+        # Fallback if Trafilatura returns empty (e.g. raw code/markdown files)
         if not extracted_text:
-            extracted_text = soup.get_text(separator="\n", strip=True) if 'soup' in locals() else html
-            
-        doc_info = DocumentInfo(source_url=url, title=soup.title.string if 'soup' in locals() and soup.title else url)
+            extracted_text = soup.get_text(separator="\n", strip=True) if soup is not None else html
+
+        if not extracted_text or not extracted_text.strip():
+            raise ValueError(f"No readable text content could be extracted from {url}")
+
+        title = url
+        if soup is not None and soup.title and soup.title.string:
+            title = soup.title.string.strip()
+
+        doc_info = DocumentInfo(source_url=url, title=title)
         return RawContent(
             text=extracted_text,
             doc_info=doc_info,
-            original_format="html"
+            original_format="html",
         )
 
-    def _extract_with_playwright(self, url: str) -> str:
+    def _extract_with_playwright(self, url: str) -> str | None:
         try:
             from playwright.sync_api import sync_playwright
+
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
-                page = browser.new_page()
-                # Use domcontentloaded to avoid hanging on GitHub websockets
+                page = browser.new_page(user_agent=DEFAULT_HEADERS["User-Agent"])
                 page.goto(url, wait_until="domcontentloaded", timeout=15000)
                 html = page.content()
                 browser.close()
                 return html
         except Exception as e:
-            print(f"[Playwright Fallback] Failed: {e}")
-            return f"<html><body><h1>Extraction Failed</h1><p>{str(e)}</p></body></html>"
+            print(f"[Playwright Fallback] Warning: {e}")
+            return None

@@ -23,3 +23,4 @@ class FinalMarkdown(BaseModel):
     """Final Output"""
     text: str
     doc_info: DocumentInfo
+    stats: Dict[str, Any] = Field(default_factory=dict)

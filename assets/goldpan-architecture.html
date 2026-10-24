@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GoldPan AI · System Architecture</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #0C0A09;
+      --color-ink:     #F5F5F4;
+      --color-muted:   #A8A29E;
+      --color-accent:  #FACC15;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+
+    .frame { max-width: 1120px; width: 100%; }
+
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    h1 {
+      font-family: var(--font-serif);
+      font-size: 2rem;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 1.5rem;
+    }
+
+    svg { width: 100%; min-width: 960px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">System Architecture · GoldPan AI v2.0</p>
+    <h1>Dual-Mode Multimodal Refinery &amp; Local RAG Pipeline</h1>
+
+    <svg viewBox="0 0 1060 500" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="goldpan-arch-title goldpan-arch-desc">
+      <title id="goldpan-arch-title">GoldPan AI Dual-Mode Multimodal Refinery and Local RAG Architecture</title>
+      <desc id="goldpan-arch-desc">Architecture diagram illustrating how documents, web pages, and media flow through universal extractors into the heuristic and semantic refinery pipeline, then persist into dual-mode ChromaDB ONNX or Gemini vector collections for grounded multi-turn RAG chat.</desc>
+      <defs>
+        <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse">
+          <circle cx="1" cy="1" r="0.9" fill="rgba(245,245,244,0.08)"/>
+        </pattern>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#A8A29E"/>
+        </marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#FACC15"/>
+        </marker>
+        <marker id="arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#60A5FA"/>
+        </marker>
+      </defs>
+
+      <!-- Background -->
+      <rect width="100%" height="100%" fill="#0C0A09"/>
+      <rect width="100%" height="100%" fill="url(#dots)" opacity="0.6"/>
+
+      <!-- Zone 1: Universal Ingestion -->
+      <rect x="40" y="48" width="224" height="352" rx="8"
+            fill="rgba(245,245,244,0.02)" stroke="rgba(245,245,244,0.12)" stroke-width="0.8"/>
+      <rect x="84" y="52" width="136" height="12" rx="4" fill="#0C0A09"/>
+      <text x="152" y="60" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace"
+            text-anchor="middle" letter-spacing="0.14em">01 · INGESTION</text>
+
+      <!-- Zone 2: Dual-Mode Refinery Pipeline -->
+      <rect x="336" y="48" width="388" height="236" rx="8"
+            fill="rgba(250,204,21,0.02)" stroke="rgba(250,204,21,0.22)" stroke-width="0.8" stroke-dasharray="4,4"/>
+      <rect x="444" y="52" width="172" height="12" rx="4" fill="#0C0A09"/>
+      <text x="530" y="60" fill="#FACC15" font-size="8" font-family="'Geist Mono', monospace"
+            text-anchor="middle" letter-spacing="0.14em">02 · REFINERY PIPELINE</text>
+
+      <!-- Zone 3: Dual-Mode Vector KB & RAG -->
+      <rect x="796" y="48" width="224" height="352" rx="8"
+            fill="rgba(245,245,244,0.02)" stroke="rgba(245,245,244,0.12)" stroke-width="0.8"/>
+      <rect x="832" y="52" width="152" height="12" rx="4" fill="#0C0A09"/>
+      <text x="908" y="60" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace"
+            text-anchor="middle" letter-spacing="0.14em">03 · LOCAL / CLOUD KB</text>
+
+      <!-- ================= ARROWS (drawn before boxes) ================= -->
+
+      <!-- 1. Document & Media -> Heuristic & Semantic Filter (straight horizontal at y=120) -->
+      <line x1="244" y1="120" x2="356" y2="120" stroke="#FACC15" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+
+      <!-- 2. Dynamic Web & Video -> Heuristic & Semantic Filter (two-bend orthogonal path) -->
+      <path d="M 244,216 H 292 Q 300,216 300,208 V 144 Q 300,136 308,136 H 356"
+            fill="none" stroke="#A8A29E" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- 3. Heuristic & Semantic Filter -> Markdown Formatter (straight horizontal at y=120) -->
+      <line x1="516" y1="120" x2="548" y2="120" stroke="#FACC15" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+
+      <!-- 4. Markdown Formatter -> Semantic Chunker (exit bottom of Formatter x=628,y=152 -> enter right of Chunker x=612,y=224) -->
+      <path d="M 628,152 V 216 Q 628,224 620,224 H 612"
+            fill="none" stroke="#A8A29E" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+      <!-- 5. Semantic Chunker -> ChromaDB Dual Store (exit bottom x=532,y=256 -> route right to x=756 -> up to y=120 -> enter left of ChromaDB x=816,y=120) -->
+      <path d="M 532,256 V 264 Q 532,272 540,272 H 748 Q 756,272 756,264 V 128 Q 756,120 764,120 H 816"
+            fill="none" stroke="#FACC15" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+
+      <!-- 6. ChromaDB Dual Store -> Grounded RAG & KB Mirror (straight vertical at x=908) -->
+      <line x1="908" y1="152" x2="908" y2="312" stroke="#FACC15" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+
+      <!-- 7. Next.js 16 Workspace -> Grounded RAG & KB Mirror (HTTP API call at y=336) -->
+      <line x1="244" y1="336" x2="816" y2="336" stroke="#60A5FA" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+
+      <!-- 8. Grounded RAG & KB Mirror -> Next.js 16 Workspace (dashed response at y=356) -->
+      <line x1="816" y1="356" x2="244" y2="356" stroke="#A8A29E" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+
+      <!-- ================= ARROW LABELS (6-10px margin from stroke) ================= -->
+
+      <!-- Label on Arrow 1 (y=120, mask at y=100..112 -> 8px gap) -->
+      <rect x="268" y="100" width="64" height="12" rx="4" fill="#0C0A09"/>
+      <text x="300" y="108" fill="#FACC15" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">RAW TEXT</text>
+
+      <!-- Label on Arrow 5 (horizontal segment y=272, mask at y=252..264 -> 8px gap) -->
+      <rect x="616" y="252" width="68" height="12" rx="4" fill="#0C0A09"/>
+      <text x="650" y="260" fill="#FACC15" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CLEAN MD</text>
+
+      <!-- Label on Arrow 6 (vertical segment x=908, placed to right x=916..996 at y=224..236 -> 8px gap) -->
+      <rect x="916" y="224" width="80" height="12" rx="4" fill="#0C0A09"/>
+      <text x="956" y="232" fill="#FACC15" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">TOP-K HITS</text>
+
+      <!-- Label on Arrow 7 (y=336, mask at y=316..328 -> 8px gap) -->
+      <rect x="484" y="316" width="92" height="12" rx="4" fill="#0C0A09"/>
+      <text x="530" y="324" fill="#60A5FA" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">REST API :8000</text>
+
+      <!-- Label on Arrow 8 (y=356, mask at y=364..376 -> 8px gap below stroke) -->
+      <rect x="476" y="364" width="108" height="12" rx="4" fill="#0C0A09"/>
+      <text x="530" y="372" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CITATIONS + MD</text>
+
+      <!-- ================= NODES (4px grid aligned) ================= -->
+
+      <!-- Node 1: Document & Media Extractors -->
+      <rect x="60" y="88" width="184" height="64" rx="6" fill="#0C0A09"/>
+      <rect x="60" y="88" width="184" height="64" rx="6" fill="#1C1917" stroke="#F5F5F4" stroke-width="1"/>
+      <rect x="68" y="96" width="36" height="12" rx="4" fill="transparent" stroke="rgba(245,245,244,0.40)" stroke-width="0.8"/>
+      <text x="86" y="104" fill="#F5F5F4" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FILE</text>
+      <text x="152" y="124" fill="#F5F5F4" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">File &amp; Multimodal</text>
+      <text x="152" y="140" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">MarkItDown · LiteParse · EXIF</text>
+
+      <!-- Node 2: Dynamic Web & Video -->
+      <rect x="60" y="184" width="184" height="64" rx="6" fill="#0C0A09"/>
+      <rect x="60" y="184" width="184" height="64" rx="6" fill="#1C1917" stroke="#F5F5F4" stroke-width="1"/>
+      <rect x="68" y="192" width="36" height="12" rx="4" fill="transparent" stroke="rgba(245,245,244,0.40)" stroke-width="0.8"/>
+      <text x="86" y="200" fill="#F5F5F4" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">WEB</text>
+      <text x="152" y="220" fill="#F5F5F4" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Hybrid Web &amp; Media</text>
+      <text x="152" y="236" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Trafilatura · Playwright · YT</text>
+
+      <!-- Node 3: Next.js 16 Workspace -->
+      <rect x="60" y="312" width="184" height="64" rx="6" fill="#0C0A09"/>
+      <rect x="60" y="312" width="184" height="64" rx="6" fill="rgba(168,162,158,0.10)" stroke="#78716C" stroke-width="1"/>
+      <rect x="68" y="320" width="32" height="12" rx="4" fill="transparent" stroke="rgba(168,162,158,0.40)" stroke-width="0.8"/>
+      <text x="84" y="328" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SPA</text>
+      <text x="152" y="348" fill="#F5F5F4" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Next.js 16 Workspace</text>
+      <text x="152" y="364" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">React 19 · Tailwind v4 :3000</text>
+
+      <!-- Node 4: Heuristic & Semantic Filter (Focal 1) -->
+      <rect x="356" y="88" width="160" height="64" rx="6" fill="#0C0A09"/>
+      <rect x="356" y="88" width="160" height="64" rx="6" fill="rgba(250,204,21,0.10)" stroke="#FACC15" stroke-width="1.2"/>
+      <rect x="364" y="96" width="36" height="12" rx="4" fill="transparent" stroke="rgba(250,204,21,0.50)" stroke-width="0.8"/>
+      <text x="382" y="104" fill="#FACC15" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SIFT</text>
+      <text x="436" y="124" fill="#F5F5F4" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Semantic Refinery</text>
+      <text x="436" y="140" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Regex + 10-Thread Gemini</text>
+
+      <!-- Node 5: Markdown Formatter -->
+      <rect x="548" y="88" width="160" height="64" rx="6" fill="#0C0A09"/>
+      <rect x="548" y="88" width="160" height="64" rx="6" fill="#1C1917" stroke="#F5F5F4" stroke-width="1"/>
+      <rect x="556" y="96" width="32" height="12" rx="4" fill="transparent" stroke="rgba(245,245,244,0.40)" stroke-width="0.8"/>
+      <text x="572" y="104" fill="#F5F5F4" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FMT</text>
+      <text x="628" y="124" fill="#F5F5F4" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Markdown Formatter</text>
+      <text x="628" y="140" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Header &amp; Whitespace Norm</text>
+
+      <!-- Node 6: Semantic Chunker -->
+      <rect x="452" y="192" width="160" height="64" rx="6" fill="#0C0A09"/>
+      <rect x="452" y="192" width="160" height="64" rx="6" fill="#1C1917" stroke="#F5F5F4" stroke-width="1"/>
+      <rect x="460" y="200" width="36" height="12" rx="4" fill="transparent" stroke="rgba(245,245,244,0.40)" stroke-width="0.8"/>
+      <text x="478" y="208" fill="#F5F5F4" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SPLIT</text>
+      <text x="532" y="228" fill="#F5F5F4" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Semantic Chunker</text>
+      <text x="532" y="244" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Block &amp; Table Preserving</text>
+
+      <!-- Node 7: ChromaDB Dual Store (Focal 2) -->
+      <rect x="816" y="88" width="184" height="64" rx="6" fill="#0C0A09"/>
+      <rect x="816" y="88" width="184" height="64" rx="6" fill="rgba(250,204,21,0.10)" stroke="#FACC15" stroke-width="1.2"/>
+      <rect x="824" y="96" width="36" height="12" rx="4" fill="transparent" stroke="rgba(250,204,21,0.50)" stroke-width="0.8"/>
+      <text x="842" y="104" fill="#FACC15" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">VECT</text>
+      <text x="908" y="124" fill="#F5F5F4" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">ChromaDB Dual Store</text>
+      <text x="908" y="140" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">ONNX 384d · Gemini 768d</text>
+
+      <!-- Node 8: Grounded RAG & KB Mirror -->
+      <rect x="816" y="312" width="184" height="64" rx="6" fill="#0C0A09"/>
+      <rect x="816" y="312" width="184" height="64" rx="6" fill="rgba(245,245,244,0.05)" stroke="#A8A29E" stroke-width="1"/>
+      <rect x="824" y="320" width="36" height="12" rx="4" fill="transparent" stroke="rgba(168,162,158,0.50)" stroke-width="0.8"/>
+      <text x="842" y="328" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CHAT</text>
+      <text x="908" y="348" fill="#F5F5F4" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">RAG &amp; KB/*.md Mirror</text>
+      <text x="908" y="364" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">Gemini 2.5 · Offline Extract</text>
+
+      <!-- ================= LEGEND STRIP (Bottom) ================= -->
+      <line x1="40" y1="428" x2="1020" y2="428" stroke="rgba(245,245,244,0.12)" stroke-width="0.8"/>
+      <text x="40" y="444" fill="#A8A29E" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+
+      <rect x="40" y="460" width="16" height="12" rx="4" fill="rgba(250,204,21,0.10)" stroke="#FACC15" stroke-width="1.2"/>
+      <text x="64" y="468" fill="#A8A29E" font-size="8" font-family="'Geist', sans-serif">Focal dual-mode core</text>
+
+      <rect x="200" y="460" width="16" height="12" rx="4" fill="#1C1917" stroke="#F5F5F4" stroke-width="1"/>
+      <text x="224" y="468" fill="#A8A29E" font-size="8" font-family="'Geist', sans-serif">Pipeline stage</text>
+
+      <rect x="336" y="460" width="16" height="12" rx="4" fill="rgba(245,245,244,0.05)" stroke="#A8A29E" stroke-width="1"/>
+      <text x="360" y="468" fill="#A8A29E" font-size="8" font-family="'Geist', sans-serif">Storage &amp; synthesis</text>
+
+      <rect x="488" y="460" width="16" height="12" rx="4" fill="rgba(168,162,158,0.10)" stroke="#78716C" stroke-width="1"/>
+      <text x="512" y="468" fill="#A8A29E" font-size="8" font-family="'Geist', sans-serif">User interface</text>
+
+      <line x1="620" y1="464" x2="648" y2="464" stroke="#FACC15" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+      <text x="656" y="468" fill="#A8A29E" font-size="8" font-family="'Geist', sans-serif">Primary data flow</text>
+
+      <line x1="776" y1="464" x2="804" y2="464" stroke="#60A5FA" stroke-width="1.2" marker-end="url(#arrow-link)"/>
+      <text x="812" y="468" fill="#A8A29E" font-size="8" font-family="'Geist', sans-serif">HTTP request</text>
+
+      <line x1="904" y1="464" x2="932" y2="464" stroke="#A8A29E" stroke-width="1" stroke-dasharray="4,3" marker-end="url(#arrow)"/>
+      <text x="940" y="468" fill="#A8A29E" font-size="8" font-family="'Geist', sans-serif">Grounded response</text>
+    </svg>
+  </div>
+</body>
+</html>
