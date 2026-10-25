@@ -17,7 +17,7 @@ def test_health_endpoint():
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "ok"
-    assert data["version"] == "2.0.0"
+    assert data["version"] == "2.1.0"
 
 
 def test_sample_files_extraction():

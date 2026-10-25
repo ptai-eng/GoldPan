@@ -2,9 +2,12 @@ import os
 import io
 import sys
 import json
+import math
 import time
 import tempfile
 import shutil
+import unicodedata
+from unittest.mock import patch, MagicMock
 import pytest
 
 # Allow running directly from repository root
@@ -24,14 +27,14 @@ from goldpan.extractors.liteparse_wrapper import LiteParseExtractor
 from goldpan.filters.heuristic_filter import HeuristicFilter
 from goldpan.filters.semantic_router import SemanticRouterFilter
 from goldpan.formatters.markdown_formatter import AIFriendlyMarkdownFormatter
-from goldpan.kb.chroma_manager import ChromaManager
+from goldpan.kb.chroma_manager import ChromaManager, compute_document_id, GEMINI_EMBEDDING_DIM
 from goldpan.mcp_server import GoldPanMCPServer
 from goldpan.cli import app as cli_app
 import main as backend_main
 
 
 def test_web_extractor():
-    print("=== [1/8] Testing Hybrid Web Extractor (URL) ===")
+    print("=== [1/10] Testing Hybrid Web Extractor (URL) ===")
     url = "https://example.com"
     extractor = HybridWebExtractor(use_playwright_fallback=False)
     pipeline = GoldPanPipeline(extractor=extractor)
@@ -48,7 +51,7 @@ def test_web_extractor():
 
 
 def test_file_extractor():
-    print("=== [2/8] Testing MarkItDown + Heuristic & Semantic Filters ===")
+    print("=== [2/10] Testing MarkItDown + Heuristic & Semantic Filters ===")
     test_file = os.path.join(ROOT_DIR, "test_document_tmp.txt")
     with open(test_file, "w", encoding="utf-8") as f:
         f.write(
@@ -82,7 +85,7 @@ def test_file_extractor():
 
 
 def test_liteparse_extractor():
-    print("=== [3/8] Testing LiteParse Extractor (CSV -> Markdown Table) ===")
+    print("=== [3/10] Testing LiteParse Extractor (CSV -> Markdown Table) ===")
     test_file = os.path.join(ROOT_DIR, "test_table_tmp.csv")
     with open(test_file, "w", encoding="utf-8") as f:
         f.write("Model,Dimension,Mode\nall-MiniLM-L6-v2,384,Local ONNX\ngemini-embedding-001,768,Cloud API\n")
@@ -104,7 +107,7 @@ def test_liteparse_extractor():
 
 
 def test_local_onnx_kb():
-    print("=== [4/8] Testing Dual-Mode ChromaManager (100% Offline Local ONNX) ===")
+    print("=== [4/10] Testing Dual-Mode ChromaManager (100% Offline Local ONNX) ===")
     tmp_dir = tempfile.mkdtemp(prefix="goldpan_kb_test_")
     try:
         kb = ChromaManager(persist_directory=tmp_dir, prefer_local=True)
@@ -122,6 +125,7 @@ def test_local_onnx_kb():
         assert len(hits) == 1
         assert "all-MiniLM-L6-v2" in hits[0]["text"]
         assert hits[0]["embedding_mode"] == "local_onnx"
+        assert hits[0]["rrf_score"] > 0
 
         kb.delete_document("doc-001")
         assert len(kb.get_all_documents()) == 0
@@ -131,7 +135,7 @@ def test_local_onnx_kb():
 
 
 def test_mcp_server_contracts():
-    print("=== [5/8] Testing GoldPan MCP Server (JSON-RPC 2.0 + rea-tool-design Contracts) ===")
+    print("=== [5/10] Testing GoldPan MCP Server (JSON-RPC 2.0 + rea-tool-design Contracts) ===")
     tmp_chroma = tempfile.mkdtemp(prefix="goldpan_mcp_chroma_")
     tmp_kb = tempfile.mkdtemp(prefix="goldpan_mcp_kb_")
     sample_md = os.path.join(tmp_kb, "sample_input.md")
@@ -144,7 +148,7 @@ def test_mcp_server_contracts():
         # 1. initialize
         init_res = server.handle_request({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
         assert init_res["result"]["serverInfo"]["name"] == "goldpan-mcp"
-        assert init_res["result"]["serverInfo"]["version"] == "2.0.0"
+        assert init_res["result"]["serverInfo"]["version"] == "2.1.0"
 
         # 2. tools/list
         tools_res = server.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
@@ -195,6 +199,7 @@ def test_mcp_server_contracts():
         )
         search_payload = json.loads(search_res["result"]["content"][0]["text"])
         assert search_payload["results_count"] >= 1
+        assert search_payload["results"][0]["rrf_score"] > 0
         assert search_payload["_meta"]["provenance"]["untrusted_content"] is True
         assert "coverage" in search_payload
 
@@ -230,11 +235,11 @@ def test_mcp_server_contracts():
 
 
 def test_cli_commands():
-    print("=== [6/8] Testing GoldPan CLI (Typer + Rich Entrypoint) ===")
+    print("=== [6/10] Testing GoldPan CLI (Typer + Rich Entrypoint) ===")
     runner = CliRunner()
     ver_res = runner.invoke(cli_app, ["version"])
     assert ver_res.exit_code == 0
-    assert "GoldPan AI v2.0.0" in ver_res.stdout
+    assert "GoldPan AI v2.1.0" in ver_res.stdout
 
     sample_file = os.path.join(ROOT_DIR, "README.md")
     ext_res = runner.invoke(cli_app, ["extract", sample_file, "--detail", "summary", "--max-chars", "250", "--json"])
@@ -246,8 +251,7 @@ def test_cli_commands():
 
 
 def test_algorithmic_edge_cases_and_mutations():
-    print("=== [7/8] Testing Algorithmic Edge Cases & Mutation Guards (rea-ci-tests-audit) ===")
-    # 1. SemanticRouterFilter._apply_local + HeuristicFilter + AIFriendlyMarkdownFormatter
+    print("=== [7/10] Testing Algorithmic Edge Cases & Mutation Guards (rea-ci-tests-audit) ===")
     raw_md = (
         "#Architecture Overview\n\n"
         "[Home](https://example.com/nav)\n"
@@ -273,30 +277,20 @@ def test_algorithmic_edge_cases_and_mutations():
     s_filtered = SemanticRouterFilter(use_api=False).apply(h_filtered)
     final_md = AIFriendlyMarkdownFormatter().format(s_filtered)
 
-    # ATX heading normalized outside code block
     assert "# Architecture Overview" in final_md.text
-    # Short section heading preserved by SemanticRouterFilter._apply_local
     assert "## Code Example" in final_md.text
-    # Standalone nav link and short cookie policy stripped
     assert "[Home](https://example.com/nav)" not in final_md.text
     assert "\nCookie policy\n" not in final_md.text
-    # Short non-punctuated UI button stripped by SemanticRouterFilter._apply_local
     assert "Sign Up Now" not in final_md.text
-    # Academic citation with brackets + trailing link MUST be preserved
     assert "[1] Vaswani et al. (2017)" in final_md.text
     assert "[Attention Is All You Need](https://arxiv.org/abs/1706.03762)" in final_md.text
-    # Long prose paragraph mentioning "cookie policy" MUST be preserved
     assert "analyzing how a cookie policy interacts with GDPR" in final_md.text
-    # Shebang and comments inside fenced code block MUST NOT have space injected after '#'
     assert "#!/usr/bin/env python3" in final_md.text
     assert "#include_guard" in final_md.text
-    # Fenced code block with blank line between x = 1 and y = 2 kept intact
     assert "x = 1\n\ny = 2" in final_md.text
-    # Short Markdown table and bullet list preserved
     assert "| Key | Value |" in final_md.text
     assert "- Bullet item one" in final_md.text
 
-    # 2. LiteParseExtractor: CSV cell pipe/newline escaping & corrupt JSON rejection
     tmp_dir = tempfile.mkdtemp(prefix="goldpan_edge_")
     try:
         csv_path = os.path.join(tmp_dir, "edge.csv")
@@ -316,7 +310,6 @@ def test_algorithmic_edge_cases_and_mutations():
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
-    # 3. HybridWebExtractor: YouTube ID parsing & SSRF guard
     web_ext = HybridWebExtractor(use_playwright_fallback=False)
     assert web_ext._extract_youtube_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == "dQw4w9WgXcQ"
     assert web_ext._extract_youtube_id("https://youtu.be/dQw4w9WgXcQ?t=10") == "dQw4w9WgXcQ"
@@ -330,15 +323,126 @@ def test_algorithmic_edge_cases_and_mutations():
     print("[PASS] Algorithmic Edge Cases & Mutation Guards verified\n")
 
 
+def test_gemini_768d_and_rrf_fusion():
+    print("=== [8/10] Testing Gemini 768d MRL Embeddings, 429 Retry & Cross-Collection RRF Fusion ===")
+    tmp_dir = tempfile.mkdtemp(prefix="goldpan_rrf_test_")
+    try:
+        kb = ChromaManager(persist_directory=tmp_dir, prefer_local=False)
+        kb.set_api_key("AIzaSyFakeKeyForUnitTestVerification12345")
+
+        # 1. Ingest a local document into goldpan_kb_local (384d)
+        kb.prefer_local = True
+        kb.ingest_document(
+            document_id="doc-local",
+            text="# Offline Engine\n\nGoldPan runs all-MiniLM-L6-v2 ONNX locally in 384 dimensions.",
+            metadata={"title": "Offline Engine Spec", "file_path": "offline.md"},
+        )
+
+        # 2. Mock Gemini embedding endpoint: first call returns 429, second call returns 768d vector
+        kb.prefer_local = False
+        captured_payloads = []
+        call_count = {"n": 0}
+
+        def fake_post(url, json=None, timeout=20):
+            captured_payloads.append(json)
+            call_count["n"] += 1
+            resp = MagicMock()
+            if call_count["n"] == 1:
+                resp.ok = False
+                resp.status_code = 429
+                resp.text = "RESOURCE_EXHAUSTED"
+                return resp
+            resp.ok = True
+            resp.status_code = 200
+            raw_vec = [float((i % 7) + 1) for i in range(GEMINI_EMBEDDING_DIM)]
+            resp.json.return_value = {"embedding": {"values": raw_vec}}
+            return resp
+
+        with patch("requests.post", side_effect=fake_post), patch("time.sleep", return_value=None):
+            mode = kb.ingest_document(
+                document_id="doc-cloud",
+                text="# Cloud Engine\n\nGoldPan supports Gemini 768d Matryoshka embeddings with RRF fusion.",
+                metadata={"title": "Cloud Engine Spec", "file_path": "cloud.md"},
+            )
+            assert mode == "gemini_api"
+            assert captured_payloads[0]["outputDimensionality"] == 768
+
+            # Verify L2 normalization on stored vector
+            stored = kb.gemini_collection.get(include=["embeddings"])
+            vec = stored["embeddings"][0]
+            assert len(vec) == 768
+            l2_norm = math.sqrt(sum(float(v) * float(v) for v in vec))
+            assert math.isclose(l2_norm, 1.0, rel_tol=1e-4)
+
+            # 3. Search across both 384d local_collection and 768d gemini_collection via RRF
+            hits = kb.search_with_citations("Gemini 768d Matryoshka embeddings", n_results=2)
+            assert len(hits) == 2
+            modes_returned = {h["embedding_mode"] for h in hits}
+            assert modes_returned == {"local_onnx", "gemini_api"}
+            assert hits[0]["title"] == "Cloud Engine Spec"
+            assert hits[0]["rrf_score"] > hits[1]["rrf_score"]
+
+        print("[PASS] Gemini 768d MRL outputDimensionality, L2 Norm, 429 Backoff & RRF Fusion verified\n")
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+def test_idempotent_ingest_and_vietnamese_retrieval():
+    print("=== [9/10] Testing Content-Hash Deduplication & Vietnamese NFD/Diacritic Retrieval ===")
+    tmp_dir = tempfile.mkdtemp(prefix="goldpan_vi_test_")
+    try:
+        kb = ChromaManager(persist_directory=tmp_dir, prefer_local=True)
+
+        # 1. Idempotent content-hash deduplication when re-ingesting same content + source
+        vn_text_nfd = unicodedata.normalize(
+            "NFD",
+            "# Quy chế tính điểm Ban Tổ Chức\n\n"
+            "Thí sinh nộp bài qua hệ thống chấm điểm tự động sẽ được đánh giá theo độ chính xác "
+            "và thời gian phản hồi của thuật toán.",
+        )
+        doc_id_1 = compute_document_id(vn_text_nfd, "tinhdiem_bantochuc.md")
+        doc_id_2 = compute_document_id(unicodedata.normalize("NFC", vn_text_nfd), "tinhdiem_bantochuc.md")
+        assert doc_id_1 == doc_id_2, "NFC and NFD forms of the same Vietnamese text must hash to the same document_id"
+
+        kb.ingest_document(
+            document_id="auto",
+            text=vn_text_nfd,
+            metadata={"title": "Quy chế tính điểm", "file_path": "tinhdiem_bantochuc.md"},
+        )
+        kb.ingest_document(
+            document_id="auto",
+            text=vn_text_nfd,
+            metadata={"title": "Quy chế tính điểm", "file_path": "tinhdiem_bantochuc.md"},
+        )
+        assert len(kb.get_all_documents()) == 1, "Re-ingesting identical document must not create duplicate entries"
+
+        # 2. Add English distractor documents
+        kb.ingest_document(
+            document_id="auto",
+            text="# Docker Deployment Guide\n\nConfigure container port bindings and healthchecks in docker-compose.yml.",
+            metadata={"title": "Docker Guide", "file_path": "docker.md"},
+        )
+
+        # 3. Query in accented Vietnamese (NFC) AND unaccented Vietnamese (ASCII-folded)
+        hits_accented = kb.search_with_citations("cách tính điểm của ban tổ chức", n_results=2)
+        assert hits_accented[0]["title"] == "Quy chế tính điểm"
+
+        hits_unaccented = kb.search_with_citations("quy che tinh diem ban to chuc", n_results=2)
+        assert hits_unaccented[0]["title"] == "Quy chế tính điểm"
+
+        print("[PASS] Content-Hash Deduplication & Vietnamese (NFC/NFD + Unaccented) Retrieval verified\n")
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
 def test_fastapi_endpoints_and_security():
-    print("=== [8/8] Testing FastAPI Endpoints, Path Traversal & Offline KB Chat ===")
+    print("=== [10/10] Testing FastAPI Endpoints, Path Traversal & Idempotent KB Ingest ===")
     tmp_chroma = tempfile.mkdtemp(prefix="goldpan_api_chroma_")
     orig_chroma = backend_main.chroma_manager
     backend_main.chroma_manager = ChromaManager(persist_directory=tmp_chroma, prefer_local=True)
     client = TestClient(backend_main.app)
 
     try:
-        # 1. Path traversal filename sanitization on /api/extract/file
         malicious_name = "../../etc/traversal_test.txt"
         content_bytes = b"Important engineering specification for GoldPan API security verification."
         res = client.post(
@@ -350,19 +454,19 @@ def test_fastapi_endpoints_and_security():
         assert body["metadata"]["file_path"] == "traversal_test.txt"
         assert ".." not in body["metadata"]["file_path"]
 
-        # 2. Ingest -> List -> Offline Chat -> Delete lifecycle
-        ing_res = client.post(
-            "/api/kb/ingest",
-            json={
-                "markdown": "# Security Spec\n\nGoldPan enforces 384-dim ONNX vectors in goldpan_kb_local.",
-                "metadata": {"title": "Security Spec", "file_path": "sec.md"},
-                "prefer_local": True,
-            },
-        )
-        assert ing_res.status_code == 200
-        ing_data = ing_res.json()
-        doc_id = ing_data["document_id"]
-        assert ing_data["embedding_mode"] == "local_onnx"
+        # Ingest twice -> verify deterministic document_id and zero duplicates
+        payload = {
+            "markdown": "# Security Spec\n\nGoldPan enforces 384-dim ONNX vectors in goldpan_kb_local.",
+            "metadata": {"title": "Security Spec", "file_path": "sec.md"},
+            "prefer_local": True,
+        }
+        ing_res_1 = client.post("/api/kb/ingest", json=payload).json()
+        ing_res_2 = client.post("/api/kb/ingest", json=payload).json()
+        assert ing_res_1["document_id"] == ing_res_2["document_id"]
+        doc_id = ing_res_1["document_id"]
+
+        docs_now = client.get("/api/kb/documents").json()["documents"]
+        assert len(docs_now) == 1
 
         chat_res = client.post(
             "/api/kb/chat",
@@ -370,14 +474,14 @@ def test_fastapi_endpoints_and_security():
         )
         assert chat_res.status_code == 200
         chat_data = chat_res.json()
-        assert chat_data["mode"] in ("local_extractive", "gemini_rag")
+        assert chat_data["mode"] == "local_extractive"
         assert len(chat_data["citations"]) >= 1
 
         del_res = client.delete(f"/api/kb/documents/{doc_id}")
         assert del_res.status_code == 200
         docs_after = client.get("/api/kb/documents").json()["documents"]
         assert len(docs_after) == 0
-        print("[PASS] FastAPI Endpoints, Path Traversal Guard & Offline KB Chat verified\n")
+        print("[PASS] FastAPI Endpoints, Path Traversal Guard & Idempotent KB Ingest verified\n")
     finally:
         backend_main.chroma_manager = orig_chroma
         shutil.rmtree(tmp_chroma, ignore_errors=True)
@@ -391,5 +495,7 @@ if __name__ == "__main__":
     test_mcp_server_contracts()
     test_cli_commands()
     test_algorithmic_edge_cases_and_mutations()
+    test_gemini_768d_and_rrf_fusion()
+    test_idempotent_ingest_and_vietnamese_retrieval()
     test_fastapi_endpoints_and_security()
-    print("All 8 GoldPan v2.0 verification & audit suites passed!")
+    print("All 10 GoldPan v2.1 verification & audit suites passed!")

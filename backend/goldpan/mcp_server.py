@@ -15,7 +15,7 @@ from .extractors.web_extractor import HybridWebExtractor
 from .filters.heuristic_filter import HeuristicFilter
 from .filters.semantic_router import SemanticRouterFilter
 from .formatters.markdown_formatter import AIFriendlyMarkdownFormatter
-from .kb.chroma_manager import ChromaManager
+from .kb.chroma_manager import ChromaManager, compute_document_id
 
 PROTOCOL_VERSION = "2024-11-05"
 
@@ -289,8 +289,8 @@ class GoldPanMCPServer:
 
             ingested_info = None
             if ingest_to_kb:
-                doc_id = str(uuid.uuid4())
                 title = result.doc_info.title or os.path.basename(source)
+                doc_id = compute_document_id(full_text, source)
                 physical_path = self._save_physical_kb_file(doc_id, source, full_text)
                 meta = {
                     "document_id": doc_id,
@@ -345,7 +345,7 @@ class GoldPanMCPServer:
             if not markdown:
                 raise ValueError("'markdown' cannot be empty.")
 
-            doc_id = str(uuid.uuid4())
+            doc_id = compute_document_id(markdown, source)
             self.chroma.prefer_local = prefer_local
             physical_path = self._save_physical_kb_file(doc_id, source, markdown)
             meta = {
@@ -401,6 +401,7 @@ class GoldPanMCPServer:
                         "source": h["source"],
                         "embedding_mode": h["embedding_mode"],
                         "distance": round(h["distance"], 4),
+                        "rrf_score": h.get("rrf_score", 0.0),
                         "truncated": truncated,
                         "text": text,
                     }

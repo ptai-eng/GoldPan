@@ -19,13 +19,13 @@ from goldpan.extractors.liteparse_wrapper import LiteParseExtractor
 from goldpan.filters.heuristic_filter import HeuristicFilter
 from goldpan.filters.semantic_router import SemanticRouterFilter
 from goldpan.formatters.markdown_formatter import AIFriendlyMarkdownFormatter
-from goldpan.kb.chroma_manager import ChromaManager
+from goldpan.kb.chroma_manager import ChromaManager, compute_document_id
 from google import genai
 
 app = FastAPI(
     title="GoldPan AI API",
     description="Privacy-First Multimodal Data Extraction & Dual-Mode Local RAG Pipeline",
-    version="2.0.0",
+    version="2.1.0",
 )
 
 # Enable CORS for Next.js frontend
@@ -92,18 +92,17 @@ def ingest_document(req: IngestRequest, x_gemini_api_key: Optional[str] = Header
         chroma_manager.set_api_key(x_gemini_api_key)
         chroma_manager.prefer_local = req.prefer_local
 
-        doc_id = str(uuid.uuid4())
         meta = dict(req.metadata or {})
-        meta["document_id"] = doc_id
-
         source_name = (
             meta.get("file_path")
             or meta.get("source_url")
             or meta.get("title")
-            or doc_id
+            or "document"
         )
+        doc_id = compute_document_id(req.markdown, str(source_name))
+        meta["document_id"] = doc_id
 
-        # Save physical Markdown mirror in KB/
+        # Save physical Markdown mirror in KB/ (overwriting any previous mirror for this deterministic doc_id)
         kb_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "KB")
         os.makedirs(kb_dir, exist_ok=True)
 
@@ -337,4 +336,4 @@ def extract_file(file: UploadFile = File(...), x_gemini_api_key: Optional[str] =
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "version": "2.0.0"}
+    return {"status": "ok", "version": "2.1.0"}

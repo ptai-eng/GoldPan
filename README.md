@@ -56,10 +56,11 @@ The backend pipeline (`backend/goldpan/`) is organized into four decoupled layer
    - `HeuristicFilter` — Fast line-level boilerplate stripping (cookie notices, newsletter prompts, standalone nav links) with byte-level telemetry.
    - `SemanticRouterFilter` — Splits large documents into 15,000-character blocks and processes up to 10 chunks concurrently via `ThreadPoolExecutor` at `temperature=0.0` (or falls back to local paragraph-density heuristics when offline).
 3. **Formatter (`goldpan/formatters/`):**
-   - `AIFriendlyMarkdownFormatter` — Normalizes ATX headings, collapses excessive whitespace, injects missing document titles, and forwards noise-reduction metrics.
-4. **Dual-Mode Knowledge Base (`goldpan/kb/chroma_manager.py`):**
-   - **Markdown-Aware Semantic Chunker** preserves paragraph boundaries, headings, and tables before slicing.
-   - Manages isolated vector spaces (`goldpan_kb_local` at 384d and `goldpan_kb_gemini` at 768d) so offline and cloud embeddings never collide.
+   - `AIFriendlyMarkdownFormatter` — Normalizes Unicode to NFC (unifying decomposed Vietnamese diacritics), formats ATX headings outside code fences, collapses excessive whitespace, injects missing document titles, and forwards noise-reduction metrics.
+4. **Dual-Mode Hybrid Knowledge Base (`goldpan/kb/chroma_manager.py`):**
+   - **Idempotent Content-Hash Deduplication (`compute_document_id`)** ensures re-ingesting the same document updates vectors and `KB/*.md` mirrors in place without creating duplicates.
+   - **Fence-Preserving Semantic Chunker** preserves paragraph boundaries, headings, fenced code blocks, and tables before slicing.
+   - **3-Signal Reciprocal Rank Fusion (RRF):** Fuses rankings across `goldpan_kb_local` (384d ONNX), `goldpan_kb_gemini` (768d Matryoshka L2-normalized `gemini-embedding-001`), and a **Vietnamese-aware BM25 + Diacritic-Folded Lexical Ranker** so cross-space distances are never compared directly and offline Vietnamese queries work with or without tone marks.
 
 ---
 
@@ -74,14 +75,14 @@ GoldPan AI never locks you out when you work offline or hit free-tier API quotas
 | **Images (`.jpg`, `.png`, `.webp`)** | Local Pillow resolution, color mode & EXIF inspector | Full `gemini-2.5-flash` Vision OCR, table & scene extraction |
 | **Audio (`.mp3`, `.wav`, `.m4a`)** | Requires API Key | Native `gemini-2.5-flash` multimodal transcription |
 | **Refinery Filter** | `HeuristicFilter` + Local Paragraph Density Router | `HeuristicFilter` + 10-Thread `gemini-2.5-flash` Cleanser |
-| **Vector Embeddings (ChromaDB)** | **Local ONNX `all-MiniLM-L6-v2` (384-dim, 0 cost)** | `gemini-embedding-001` with Exponential Backoff + ONNX Fallback |
-| **Knowledge Base Querying** | Extractive Semantic Passage Retrieval + Citations | Multi-Turn Grounded RAG Synthesis + Source Citations |
+| **Vector Embeddings (ChromaDB)** | **Local ONNX `all-MiniLM-L6-v2` (384d) + Vietnamese BM25** | `gemini-embedding-001` (`outputDimensionality=768`, L2-norm) + RRF |
+| **Knowledge Base Querying** | 3-Signal RRF Extractive Retrieval + Citations | 3-Signal RRF + Multi-Turn Grounded RAG Synthesis |
 
 ---
 
 ## 🧰 CLI & Model Context Protocol (MCP) Server
 
-GoldPan v2.0 ships with an installable Python package (`pyproject.toml`) exposing both a rich terminal CLI (`goldpan`) and a standard `stdio` JSON-RPC 2.0 MCP Server (`goldpan-mcp`).
+GoldPan v2.1 ships with an installable Python package (`pyproject.toml`) exposing both a rich terminal CLI (`goldpan`) and a standard `stdio` JSON-RPC 2.0 MCP Server (`goldpan-mcp`).
 
 ### 1. Command-Line Interface (`goldpan`)
 
@@ -269,7 +270,7 @@ All endpoints are served by FastAPI at `http://localhost:8000` (interactive Swag
 | `GET` | `/api/kb/documents` | Lists all indexed documents across local ONNX and Gemini collections. |
 | `DELETE` | `/api/kb/documents/{id}` | Removes a document's vectors from ChromaDB and deletes its physical `.md` mirror from `KB/`. |
 | `POST` | `/api/kb/chat` | JSON `{ "message": "...", "history": [...] }`. Returns `{ response, context_used, citations, mode }`. |
-| `GET` | `/health` | Health check returning `{ "status": "ok", "version": "2.0.0" }`. |
+| `GET` | `/health` | Health check returning `{ "status": "ok", "version": "2.1.0" }`. |
 
 ---
 

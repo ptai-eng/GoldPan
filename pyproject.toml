@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "goldpan"
-version = "2.0.0"
+version = "2.1.0"
 description = "Privacy-First Multimodal Data Refinery, Dual-Mode Local ONNX RAG & Model Context Protocol (MCP) Server"
 readme = "README.md"
 license = { file = "LICENSE" }

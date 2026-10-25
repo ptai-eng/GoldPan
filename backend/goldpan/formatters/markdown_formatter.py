@@ -1,15 +1,18 @@
 import re
+import unicodedata
 from goldpan.core.schemas import FilteredContent, FinalMarkdown
 
 
 class AIFriendlyMarkdownFormatter:
     """
-    Normalizes ATX headings (outside fenced code blocks), collapses excessive
+    Normalizes Unicode to NFC (critical for Vietnamese diacritics from PDFs/DOCX),
+    normalizes ATX headings (outside fenced code blocks), collapses excessive
     blank lines, injects missing document title, and forwards pipeline telemetry.
     """
 
     def format(self, content: FilteredContent) -> FinalMarkdown:
-        text = content.text
+        # 0. Normalize Unicode to NFC so decomposed Vietnamese diacritics (NFD) are unified
+        text = unicodedata.normalize("NFC", content.text)
         lines = text.split("\n")
         formatted_lines = []
         in_code_fence = False
@@ -32,8 +35,10 @@ class AIFriendlyMarkdownFormatter:
         text = re.sub(r"\n{3,}", "\n\n", text)
 
         # 3. Add title if missing from text but present in doc_info
-        if content.doc_info.title and content.doc_info.title.lower() not in text[:500].lower():
-            text = f"# {content.doc_info.title}\n\n{text}"
+        if content.doc_info.title:
+            norm_title = unicodedata.normalize("NFC", content.doc_info.title)
+            if norm_title.lower() not in text[:500].lower():
+                text = f"# {norm_title}\n\n{text}"
 
         return FinalMarkdown(
             text=text.strip(),
