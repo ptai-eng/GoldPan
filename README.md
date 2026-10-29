@@ -9,7 +9,7 @@
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js 16"/></a>
     <a href="https://www.trychroma.com/"><img src="https://img.shields.io/badge/ChromaDB-ONNX_%2B_Cloud-FACC15?style=for-the-badge&logoColor=black" alt="ChromaDB"/></a>
     <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP_Server-stdio_JSON--RPC-EAB308?style=for-the-badge&logoColor=black" alt="MCP Server"/></a>
-    <a href="https://ai.google.dev/"><img src="https://img.shields.io/badge/Gemini_2.5-Flash-4285F4?style=for-the-badge&logo=google&logoColor=white" alt="Gemini 2.5 Flash"/></a>
+    <a href="#-dual-mode-operation"><img src="https://img.shields.io/badge/AI_Integration-Supported-8B5CF6?style=for-the-badge" alt="AI Integration Supported"/></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge" alt="MIT License"/></a>
   </p>
 
