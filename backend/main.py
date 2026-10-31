@@ -27,8 +27,8 @@ from goldpan.kb.onnx_embedder import collect_doctor_diagnostics
 
 app = FastAPI(
     title="GoldPan AI API",
-    description="Privacy-First Multimodal Data Refinery, Multilingual E5 ONNX RAG & Agent Context Firewall",
-    version="3.0.0",
+    description="Privacy-First Multimodal Data Refinery, Offline Vietnamese OCR, Multilingual E5 ONNX RAG & Agent Context Firewall",
+    version="3.1.0",
 )
 
 # Enable CORS for Next.js frontend
@@ -70,6 +70,7 @@ def get_pipeline(
     is_file: bool = False,
     api_key: Optional[str] = None,
     firewall_mode: str = "sanitize",
+    enable_ocr: bool = True,
 ) -> GoldPanPipeline:
     if not is_file:
         extractor = HybridWebExtractor(use_playwright_fallback=True, firewall_mode=firewall_mode)
@@ -78,7 +79,11 @@ def get_pipeline(
         if ext in [".txt", ".csv", ".json", ".md", ".xml"]:
             extractor = LiteParseExtractor()
         else:
-            extractor = MarkItDownExtractor(api_key=api_key, firewall_mode=firewall_mode)
+            extractor = MarkItDownExtractor(
+                api_key=api_key,
+                firewall_mode=firewall_mode,
+                enable_ocr=enable_ocr,
+            )
 
     pipeline = GoldPanPipeline(extractor=extractor)
     pipeline.add_filter(HeuristicFilter())
@@ -391,9 +396,54 @@ def extract_file(
         raise HTTPException(status_code=500, detail=error_msg)
     finally:
         if os.path.exists(file_path):
-            os.remove(file_path)
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
+
+
+@app.post("/api/ocr")
+def ocr_endpoint(file: UploadFile = File(...)):
+    raw_filename = os.path.basename(file.filename or "scan.bin")
+    safe_basename = re.sub(r'[\\/*?:"<>|\x00]', "_", raw_filename) or "scan.bin"
+    unique_prefix = uuid.uuid4().hex[:8]
+    file_path = os.path.join(TEMP_DIR, f"{unique_prefix}_{safe_basename}")
+
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        from goldpan.ocr.engine import VietnameseOfflineOCR
+
+        engine = VietnameseOfflineOCR()
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".pdf":
+            res = engine.extract_from_pdf(file_path)
+            return {
+                "markdown": res.text,
+                "is_scanned": res.is_scanned,
+                "backend": res.backend,
+                "avg_confidence": res.avg_confidence,
+                "pages": len(res.pages),
+            }
+        else:
+            p_res = engine.extract_from_image(file_path)
+            return {
+                "markdown": p_res.text,
+                "confidence": p_res.confidence,
+                "backend": p_res.backend,
+                "lines_count": p_res.lines_count,
+            }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+            except OSError:
+                pass
 
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "version": "3.0.0"}
+    return {"status": "ok", "version": "3.1.0"}

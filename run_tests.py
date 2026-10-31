@@ -163,7 +163,7 @@ def test_mcp_server_contracts():
         # 1. initialize
         init_res = server.handle_request({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
         assert init_res["result"]["serverInfo"]["name"] == "goldpan-mcp"
-        assert init_res["result"]["serverInfo"]["version"] == "3.0.0"
+        assert init_res["result"]["serverInfo"]["version"] == "3.1.0"
 
         # 2. tools/list
         tools_res = server.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
@@ -176,6 +176,7 @@ def test_mcp_server_contracts():
             "goldpan_kb_delete",
             "goldpan_kb_audit",
             "goldpan_doctor",
+            "goldpan_ocr",
         }.issubset(tool_names)
 
         # 3. tools/call -> goldpan_extract with summary truncation, spotlighting & firewall provenance
@@ -262,11 +263,11 @@ def test_mcp_server_contracts():
 
 
 def test_cli_commands():
-    print("=== [6/14] Testing GoldPan CLI v3.0 (version, extract, doctor) ===")
+    print("=== [6/15] Testing GoldPan CLI v3.1 (version, extract, doctor, ocr) ===")
     runner = CliRunner()
     ver_res = runner.invoke(cli_app, ["version"])
     assert ver_res.exit_code == 0
-    assert "GoldPan AI v3.0.0" in ver_res.stdout
+    assert "GoldPan AI v3.1.0" in ver_res.stdout
 
     sample_file = os.path.join(ROOT_DIR, "README.md")
     ext_res = runner.invoke(
@@ -665,6 +666,61 @@ def test_pillar_c_goldpan_bench_and_ci_gate():
     print("[PASS] Pillar C GoldPan Bench & `--ci-gate` verified (BENCHMARK_REPORT.md generated)\n")
 
 
+def test_v3_1_offline_ocr_and_tier2_hardware():
+    print("=== [15/15] Testing GoldPan v3.1: Offline Vietnamese OCR & Tier 2 Apple Silicon / OpenVINO ===")
+    from PIL import Image, ImageDraw
+    from goldpan.ocr.engine import VietnameseOfflineOCR
+    from goldpan.ocr.pdf_scanner import is_scanned_pdf, render_pdf_page_to_image
+    from goldpan.kb.onnx_embedder import select_onnx_providers
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        img_path = os.path.join(tmpdir, "test_scan.png")
+        img = Image.new("RGB", (400, 150), color=(255, 255, 255))
+        draw = ImageDraw.Draw(img)
+        draw.text((20, 30), "Cong hoa Xa hoi Chu nghia Viet Nam", fill=(0, 0, 0))
+        draw.text((20, 70), "Doc lap - Tu do - Hanh phuc", fill=(0, 0, 0))
+        img.save(img_path)
+
+        ocr_engine = VietnameseOfflineOCR()
+        res = ocr_engine.extract_from_image(img_path)
+        assert res.backend in ("rapidocr", "pytesseract", "vietocr", "builtin_glyph")
+        assert res.duration_ms >= 0
+        assert res.confidence >= 0.0
+
+        sample_pdf = os.path.join(BACKEND_DIR, "tests", "samples", "sample.pdf")
+        if os.path.exists(sample_pdf):
+            is_scanned, scanned_pages, total = is_scanned_pdf(sample_pdf)
+            assert total >= 1
+            page_img = render_pdf_page_to_image(sample_pdf, page_index=0, dpi=150)
+            assert isinstance(page_img, Image.Image)
+
+        server = GoldPanMCPServer()
+        mcp_res = server.call_tool("goldpan_ocr", {"source": img_path, "spotlight": True})
+        assert "content" in mcp_res
+        mcp_data = json.loads(mcp_res["content"][0]["text"])
+        assert "ocr" in mcp_data
+        assert "<untrusted_document_content" in mcp_data["text"]
+
+        cli_runner = CliRunner()
+        cli_res = cli_runner.invoke(cli_app, ["ocr", img_path, "--json"])
+        assert cli_res.exit_code == 0
+        cli_data = json.loads(cli_res.stdout)
+        assert "ocr" in cli_data
+
+        with patch("onnxruntime.get_available_providers", return_value=["CoreMLExecutionProvider", "CPUExecutionProvider"]):
+            with patch("platform.system", return_value="Darwin"):
+                coreml_sel = select_onnx_providers("auto")
+                assert "CoreML" in coreml_sel.tier
+                assert coreml_sel.active_provider == "CoreMLExecutionProvider"
+
+        with patch("onnxruntime.get_available_providers", return_value=["OpenVINOExecutionProvider", "CPUExecutionProvider"]):
+            openvino_sel = select_onnx_providers("openvino")
+            assert "OpenVINO" in openvino_sel.tier
+            assert openvino_sel.active_provider == "OpenVINOExecutionProvider"
+
+    print("[PASS] GoldPan v3.1 Offline OCR, MCP goldpan_ocr, CLI ocr, & Tier 2 Hardware verified\n")
+
+
 if __name__ == "__main__":
     test_web_extractor()
     test_file_extractor()
@@ -680,4 +736,5 @@ if __name__ == "__main__":
     test_pillar_b_e5_prefixes_and_migration()
     test_pillar_a_agent_context_firewall()
     test_pillar_c_goldpan_bench_and_ci_gate()
-    print("All 14 GoldPan v3.0 verification, security & benchmark suites passed!")
+    test_v3_1_offline_ocr_and_tier2_hardware()
+    print("All 15 GoldPan v3.1 verification, security, OCR & benchmark suites passed!")

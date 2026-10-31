@@ -18,7 +18,7 @@ def test_health_endpoint():
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "ok"
-    assert data["version"] == "3.0.0"
+    assert data["version"] == "3.1.0"
 
 
 def test_doctor_and_audit_endpoints():
@@ -32,6 +32,24 @@ def test_doctor_and_audit_endpoints():
     assert aud_res.status_code == 200
     aud_data = aud_res.json()
     assert "status" in aud_data
+
+
+def test_ocr_endpoint():
+    import io
+    from PIL import Image
+
+    # Create synthetic test image
+    img = Image.new("RGB", (300, 100), color=(255, 255, 255))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+
+    res = client.post("/api/ocr", files={"file": ("test_scan.png", buf, "image/png")})
+    assert res.status_code == 200, f"OCR API failed: {res.text}"
+    data = res.json()
+    assert "markdown" in data
+    assert "backend" in data
+    assert "confidence" in data
 
 
 def test_sample_files_extraction():
@@ -62,5 +80,6 @@ def test_sample_files_extraction():
 if __name__ == "__main__":
     test_health_endpoint()
     test_doctor_and_audit_endpoints()
+    test_ocr_endpoint()
     test_sample_files_extraction()
-    print("[PASS] All sample file API extractions, doctor & audit endpoints verified via TestClient!")
+    print("[PASS] All sample file API extractions, OCR, doctor & audit endpoints verified via TestClient!")

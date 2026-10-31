@@ -18,7 +18,7 @@ from .mcp_server import GoldPanMCPServer
 
 app = typer.Typer(
     name="goldpan",
-    help="GoldPan AI v3.0 — Privacy-First Multimodal Data Refinery, Multilingual E5 ONNX RAG, Context Firewall & MCP Engine.",
+    help="GoldPan AI v3.1 — Privacy-First Multimodal Data Refinery, Offline Vietnamese OCR, Multilingual E5 ONNX RAG, Context Firewall & MCP Engine.",
     add_completion=False,
 )
 console = Console()
@@ -33,6 +33,7 @@ def extract_cmd(
     ingest: bool = typer.Option(False, "--ingest", "-i", help="Also ingest extracted Markdown into the Knowledge Base."),
     no_playwright: bool = typer.Option(False, "--no-playwright", help="Disable headless Playwright fallback for URLs."),
     firewall_mode: str = typer.Option("sanitize", "--firewall-mode", help="Firewall mode: 'sanitize', 'audit', or 'strict'."),
+    ocr: bool = typer.Option(True, "--ocr/--no-ocr", help="Enable offline OCR for scanned PDFs and image files."),
     spotlight: bool = typer.Option(False, "--spotlight", help="Wrap output in <untrusted_document_content> tags."),
     as_json: bool = typer.Option(False, "--json", help="Emit structured JSON envelope with coverage & provenance."),
 ) -> None:
@@ -47,6 +48,7 @@ def extract_cmd(
             "ingest_to_kb": ingest,
             "use_playwright_fallback": not no_playwright,
             "firewall_mode": firewall_mode,
+            "enable_ocr": ocr,
             "spotlight": spotlight,
         },
     )
@@ -234,7 +236,7 @@ def doctor_cmd(
         typer.echo(json.dumps(diag, ensure_ascii=False, indent=2))
         return
 
-    table = Table(title="GoldPan AI v3.0 — System & Hardware Doctor", show_header=True)
+    table = Table(title="GoldPan AI v3.1 — System & Hardware Doctor", show_header=True)
     table.add_column("Diagnostic Check", style="bold cyan")
     table.add_column("Status / Value", style="white")
     table.add_row("Operating System", str(diag["os"]))
@@ -252,6 +254,48 @@ def doctor_cmd(
         table.add_row("Migration Advisory", "[bold yellow]Run `goldpan reindex` to migrate v2 chunks to v3 E5.[/bold yellow]")
 
     console.print(table)
+
+
+@app.command("ocr")
+def ocr_cmd(
+    source: str = typer.Argument(..., help="Path to scanned PDF or image file (.png, .jpg, .webp)."),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Write OCR text to a file."),
+    dpi: int = typer.Option(200, "--dpi", help="PDF page rasterization DPI (150-300)."),
+    spotlight: bool = typer.Option(False, "--spotlight", help="Wrap output in <untrusted_document_content> tags."),
+    as_json: bool = typer.Option(False, "--json", help="Emit structured JSON with telemetry."),
+) -> None:
+    """Run offline Vietnamese and multilingual OCR on scanned PDFs or image files."""
+    server = GoldPanMCPServer()
+    res = server.call_tool("goldpan_ocr", {"source": source, "dpi": dpi, "spotlight": spotlight})
+    payload = json.loads(res["content"][0]["text"])
+
+    if output:
+        out_path = os.path.abspath(output)
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(payload["text"])
+
+    if as_json:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+        return
+
+    ocr_meta = payload.get("ocr", {})
+    table = Table(title=f"GoldPan Offline OCR — {source}", show_header=True)
+    table.add_column("Property", style="bold cyan")
+    table.add_column("Value", style="white")
+    table.add_row("OCR Backend", str(ocr_meta.get("backend", "none")))
+    conf_val = ocr_meta.get("avg_confidence") if ocr_meta.get("avg_confidence") is not None else ocr_meta.get("confidence", 0.0)
+    table.add_row("Confidence", f"{float(conf_val):.2f}")
+    if "is_scanned" in ocr_meta:
+        table.add_row("Scanned Document", str(ocr_meta.get("is_scanned")))
+    if "pages_count" in ocr_meta:
+        table.add_row("Pages Processed", str(ocr_meta.get("pages_count")))
+    table.add_row("Duration", f"{ocr_meta.get('duration_ms', 0):.2f} ms")
+    if output:
+        table.add_row("Saved To", os.path.abspath(output))
+
+    console.print(table)
+    if not output:
+        console.print(Panel(payload["text"], title="Extracted OCR Markdown", border_style="yellow"))
 
 
 @app.command("bench")

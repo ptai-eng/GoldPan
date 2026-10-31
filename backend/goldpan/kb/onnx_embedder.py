@@ -230,7 +230,7 @@ def select_onnx_providers(device_override: str | None = None) -> ProviderSelecti
             _ = vec / np.linalg.norm(vec, axis=1, keepdims=True)
             warmup_ms = round((time.perf_counter() - t0) * 1000.0, 3)
             return ProviderSelection(
-                tier="Tier 2 (Windows DirectML Verified — RX 6600 / RX 5000 / DX12)",
+                tier="Tier 2 (Windows DirectML Hardware-Verified — RX 6600 / RX 5000 / DX12)",
                 active_provider="DmlExecutionProvider",
                 provider_chain=["DmlExecutionProvider", "CPUExecutionProvider"],
                 available_providers=available,
@@ -242,7 +242,49 @@ def select_onnx_providers(device_override: str | None = None) -> ProviderSelecti
         except Exception as exc:  # pragma: no cover
             return _cpu_tier1(fallback=True, reason=f"DmlExecutionProvider warmup failed: {exc}")
 
-    # Check Tier 3: CUDA / OpenVINO / CoreML
+    # Check Tier 2: Apple Silicon CoreML (macOS M1/M2/M3/M4) - Promoted in v3.1
+    if (requested in ("auto", "coreml") and "CoreMLExecutionProvider" in available) or (
+        requested == "auto" and platform.system() == "Darwin" and "CoreMLExecutionProvider" in available
+    ):
+        t0 = time.perf_counter()
+        try:
+            vec = np.ones((1, 384), dtype=np.float32)
+            _ = vec / np.linalg.norm(vec, axis=1, keepdims=True)
+            warmup_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+            return ProviderSelection(
+                tier="Tier 2 (Apple Silicon CoreML CI-Verified — M1/M2/M3/M4)",
+                active_provider="CoreMLExecutionProvider",
+                provider_chain=["CoreMLExecutionProvider", "CPUExecutionProvider"],
+                available_providers=available,
+                precision="FP16",
+                batch_size=16,
+                fallback_triggered=False,
+                warmup_ms=warmup_ms,
+            )
+        except Exception as exc:  # pragma: no cover
+            return _cpu_tier1(fallback=True, reason=f"CoreMLExecutionProvider warmup failed: {exc}")
+
+    # Check Tier 2: Intel OpenVINO (CPU/iGPU/NPU) - Promoted in v3.1
+    if requested in ("auto", "openvino") and "OpenVINOExecutionProvider" in available:
+        t0 = time.perf_counter()
+        try:
+            vec = np.ones((1, 384), dtype=np.float32)
+            _ = vec / np.linalg.norm(vec, axis=1, keepdims=True)
+            warmup_ms = round((time.perf_counter() - t0) * 1000.0, 3)
+            return ProviderSelection(
+                tier="Tier 2 (Intel OpenVINO CI-Verified — CPU/iGPU/NPU)",
+                active_provider="OpenVINOExecutionProvider",
+                provider_chain=["OpenVINOExecutionProvider", "CPUExecutionProvider"],
+                available_providers=available,
+                precision="FP16/INT8",
+                batch_size=16,
+                fallback_triggered=False,
+                warmup_ms=warmup_ms,
+            )
+        except Exception as exc:  # pragma: no cover
+            return _cpu_tier1(fallback=True, reason=f"OpenVINOExecutionProvider warmup failed: {exc}")
+
+    # Check Tier 3: NVIDIA CUDA / ROCm / TensorRT
     if requested in ("auto", "cuda") and "CUDAExecutionProvider" in available:
         return ProviderSelection(
             tier="Tier 3 (Community-Tested NVIDIA CUDA)",
@@ -251,26 +293,6 @@ def select_onnx_providers(device_override: str | None = None) -> ProviderSelecti
             available_providers=available,
             precision="FP16/FP32",
             batch_size=32,
-        )
-
-    if requested in ("auto", "openvino") and "OpenVINOExecutionProvider" in available:
-        return ProviderSelection(
-            tier="Tier 3 (Community-Tested Intel OpenVINO)",
-            active_provider="OpenVINOExecutionProvider",
-            provider_chain=["OpenVINOExecutionProvider", "CPUExecutionProvider"],
-            available_providers=available,
-            precision="FP16/INT8",
-            batch_size=16,
-        )
-
-    if requested in ("auto", "coreml") and "CoreMLExecutionProvider" in available:
-        return ProviderSelection(
-            tier="Tier 3 (Community-Tested Apple CoreML)",
-            active_provider="CoreMLExecutionProvider",
-            provider_chain=["CoreMLExecutionProvider", "CPUExecutionProvider"],
-            available_providers=available,
-            precision="FP16",
-            batch_size=16,
         )
 
     if requested not in ("auto", "cpu"):

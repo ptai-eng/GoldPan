@@ -31,6 +31,7 @@ def _build_pipeline(
     api_key: Optional[str] = None,
     use_playwright_fallback: bool = True,
     firewall_mode: str = "sanitize",
+    enable_ocr: bool = True,
 ) -> GoldPanPipeline:
     if _is_url(source):
         extractor = HybridWebExtractor(
@@ -42,7 +43,11 @@ def _build_pipeline(
         if ext in [".txt", ".csv", ".json", ".md", ".xml"]:
             extractor = LiteParseExtractor()
         else:
-            extractor = MarkItDownExtractor(api_key=api_key, firewall_mode=firewall_mode)
+            extractor = MarkItDownExtractor(
+                api_key=api_key,
+                firewall_mode=firewall_mode,
+                enable_ocr=enable_ocr,
+            )
 
     pipeline = GoldPanPipeline(extractor=extractor)
     pipeline.add_filter(HeuristicFilter())
@@ -119,6 +124,11 @@ class GoldPanMCPServer:
                             "enum": ["sanitize", "audit", "strict"],
                             "default": "sanitize",
                             "description": "Agent Context Firewall mode: 'sanitize' (default), 'audit', or 'strict'.",
+                        },
+                        "enable_ocr": {
+                            "type": "boolean",
+                            "default": True,
+                            "description": "Enable offline Vietnamese & multilingual OCR for scanned PDFs and images.",
                         },
                         "spotlight": {
                             "type": "boolean",
@@ -226,10 +236,37 @@ class GoldPanMCPServer:
             },
             {
                 "name": "goldpan_doctor",
-                "description": "Inspect hardware execution providers (Tier 1 CPU INT8, Tier 2 DirectML FP32, Tier 3 CUDA/OpenVINO/CoreML), warmup latency, SQLite FTS5 status, and v2->v3 migration health.",
+                "description": "Inspect hardware execution providers (Tier 1 CPU INT8, Tier 2 DirectML/CoreML/OpenVINO, Tier 3 CUDA), warmup latency, SQLite FTS5 status, and v2->v3 migration health.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {},
+                },
+            },
+            {
+                "name": "goldpan_ocr",
+                "description": (
+                    "Run 100% offline Vietnamese & Multilingual OCR on a scanned PDF or image file (.png, .jpg, .webp). "
+                    "Performs image contrast enhancement, binarization, and Agent Context Firewall sanitization."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "source": {
+                            "type": "string",
+                            "description": "Local file path to scanned PDF or image file.",
+                        },
+                        "dpi": {
+                            "type": "integer",
+                            "default": 200,
+                            "description": "Rasterization DPI for PDF pages (150-300).",
+                        },
+                        "spotlight": {
+                            "type": "boolean",
+                            "default": False,
+                            "description": "Wrap OCR markdown in <untrusted_document_content> XML spotlight tags.",
+                        },
+                    },
+                    "required": ["source"],
                 },
             },
         ]
@@ -297,12 +334,14 @@ class GoldPanMCPServer:
             use_pw = bool(arguments.get("use_playwright_fallback", True))
             firewall_mode = str(arguments.get("firewall_mode", "sanitize"))
             spotlight = bool(arguments.get("spotlight", False))
+            enable_ocr = bool(arguments.get("enable_ocr", True))
 
             pipeline = _build_pipeline(
                 source,
                 api_key=self.api_key,
                 use_playwright_fallback=use_pw,
                 firewall_mode=firewall_mode,
+                enable_ocr=enable_ocr,
             )
             result = pipeline.process(source)
             full_text = result.text
@@ -516,6 +555,55 @@ class GoldPanMCPServer:
         elif name == "goldpan_doctor":
             diag = collect_doctor_diagnostics(persist_dir=self.chroma.persist_directory)
             return {"content": [{"type": "text", "text": json.dumps(diag, ensure_ascii=False, indent=2)}]}
+
+        elif name == "goldpan_ocr":
+            source = str(arguments.get("source", "")).strip()
+            if not source or "\x00" in source:
+                raise ValueError("Invalid 'source' parameter.")
+            source = os.path.abspath(source)
+            if not os.path.exists(source):
+                raise FileNotFoundError(f"File not found: {source}")
+
+            from .ocr.engine import VietnameseOfflineOCR
+
+            ocr_engine = VietnameseOfflineOCR()
+            ext = os.path.splitext(source)[1].lower()
+            dpi = int(arguments.get("dpi", 200))
+            spotlight = bool(arguments.get("spotlight", False))
+
+            if ext == ".pdf":
+                res = ocr_engine.extract_from_pdf(source, dpi=dpi)
+                text = res.text
+                meta_info = {
+                    "is_scanned": res.is_scanned,
+                    "avg_confidence": res.avg_confidence,
+                    "backend": res.backend,
+                    "pages_count": len(res.pages),
+                    "duration_ms": res.total_duration_ms,
+                }
+            else:
+                p_res = ocr_engine.extract_from_image(source)
+                text = p_res.text
+                meta_info = {
+                    "confidence": p_res.confidence,
+                    "backend": p_res.backend,
+                    "lines_count": p_res.lines_count,
+                    "duration_ms": p_res.duration_ms,
+                }
+
+            if spotlight:
+                text = spotlight_untrusted_content(text, source=source)
+
+            payload = {
+                "source": source,
+                "text": text,
+                "ocr": meta_info,
+                "_meta": build_provenance_meta(FirewallReport(mode="sanitize"), source=source),
+            }
+            return {
+                "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, indent=2)}],
+                "_meta": payload["_meta"],
+            }
 
         else:
             raise ValueError(f"Unknown tool: {name}")

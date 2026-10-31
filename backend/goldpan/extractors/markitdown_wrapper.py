@@ -5,11 +5,17 @@ from markitdown import DocumentConverter, DocumentConverterResult, MarkItDown
 
 from goldpan.core.schemas import DocumentInfo, RawContent
 from goldpan.firewall.context_firewall import AgentContextFirewall
+from goldpan.ocr.engine import VietnameseOfflineOCR
+from goldpan.ocr.pdf_scanner import is_scanned_pdf
 from goldpan.vision.hybrid_captioner import HybridVisionCaptioner
 
 
 class GeminiMultimodalConverter(DocumentConverter):
-    def __init__(self, api_key: str | None = None) -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        firewall_mode: str = "sanitize",
+    ) -> None:
         self.api_key = api_key
         if self.api_key:
             from google import genai
@@ -18,6 +24,7 @@ class GeminiMultimodalConverter(DocumentConverter):
         else:
             self.client = None
         self.local_captioner = HybridVisionCaptioner(api_key=self.api_key)
+        self.ocr_engine = VietnameseOfflineOCR(firewall_mode=firewall_mode)
 
     def accepts(self, file_stream, stream_info, **kwargs) -> bool:
         if stream_info and stream_info.extension:
@@ -36,10 +43,22 @@ class GeminiMultimodalConverter(DocumentConverter):
 
         if not self.client:
             if ext in [".jpg", ".jpeg", ".png", ".webp"]:
-                caption = self.local_captioner.process_image(source_str)
+                # Offline OCR text recognition
+                ocr_page = self.ocr_engine.extract_from_image(source_str)
+                exif_summary = self.local_captioner.process_image(source_str)
+
+                if ocr_page.text and not ocr_page.text.startswith("[Trang scan không chứa"):
+                    content = (
+                        f"# {os.path.basename(source_str)}\n\n"
+                        f"{ocr_page.text}\n\n"
+                        f"---\n*{exif_summary} | OCR: {ocr_page.backend} (conf={ocr_page.confidence:.2f})*\n"
+                    )
+                else:
+                    content = f"# {os.path.basename(source_str)}\n\n{exif_summary}\n"
+
                 return DocumentConverterResult(
                     title=os.path.basename(source_str),
-                    text_content=f"# {os.path.basename(source_str)}\n\n{caption}\n",
+                    text_content=content,
                 )
             raise ValueError(
                 "Missing API Key for Audio transcription. Please configure your Gemini API Key in Settings."
@@ -62,32 +81,68 @@ class GeminiMultimodalConverter(DocumentConverter):
             )
         except Exception as e:
             if ext in [".jpg", ".jpeg", ".png", ".webp"]:
-                caption = self.local_captioner.process_image(source_str)
+                ocr_page = self.ocr_engine.extract_from_image(source_str)
+                exif_summary = self.local_captioner.process_image(source_str)
+                content = f"# {os.path.basename(source_str)}\n\n{ocr_page.text or exif_summary}\n"
                 return DocumentConverterResult(
                     title=os.path.basename(source_str),
-                    text_content=f"# {os.path.basename(source_str)}\n\n{caption}\n",
+                    text_content=content,
                 )
             raise ValueError(f"Gemini multimodal processing failed: {str(e)}")
 
 
 class MarkItDownExtractor:
-    def __init__(self, api_key: str | None = None, firewall_mode: str = "sanitize") -> None:
+    def __init__(
+        self,
+        api_key: str | None = None,
+        firewall_mode: str = "sanitize",
+        enable_ocr: bool = True,
+    ) -> None:
         self.md_client = MarkItDown()
         self.api_key = api_key
         self.firewall_mode = firewall_mode
+        self.enable_ocr = enable_ocr
         self.firewall = AgentContextFirewall(mode=firewall_mode)
-        self.md_client.register_converter(GeminiMultimodalConverter(self.api_key), priority=-1.0)
+        self.ocr_engine = VietnameseOfflineOCR(firewall_mode=firewall_mode)
+        self.md_client.register_converter(
+            GeminiMultimodalConverter(self.api_key, firewall_mode=firewall_mode),
+            priority=-1.0,
+        )
 
     def extract(self, source: str) -> RawContent:
         if not os.path.exists(source):
             raise FileNotFoundError(f"Source file not found: {source}")
 
         ext = os.path.splitext(source)[1].lower()
-        fw_meta = {}
+        fw_meta: dict = {}
 
         if ext == ".pdf":
             stealth_clean_text, fw_report = self.firewall.inspect_pdf_stealth(source)
             fw_meta = {"firewall": fw_report.model_dump()}
+
+            # Check if this PDF is a scanned document needing Offline OCR
+            if self.enable_ocr:
+                is_scanned, scanned_indices, total_pages = is_scanned_pdf(source)
+                if is_scanned:
+                    ocr_res = self.ocr_engine.extract_from_pdf(source)
+                    fw_meta["ocr"] = {
+                        "backend": ocr_res.backend,
+                        "avg_confidence": ocr_res.avg_confidence,
+                        "is_scanned": True,
+                        "pages_processed": len(ocr_res.pages),
+                    }
+                    if ocr_res.text:
+                        doc_info = DocumentInfo(
+                            file_path=source,
+                            title=os.path.basename(source),
+                            metadata=fw_meta,
+                        )
+                        return RawContent(
+                            text=ocr_res.text,
+                            doc_info=doc_info,
+                            original_format="pdf_scanned_ocr",
+                        )
+
             if stealth_clean_text is not None and self.firewall_mode == "sanitize":
                 doc_info = DocumentInfo(
                     file_path=source,

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "goldpan"
-version = "3.0.0"
-description = "Privacy-First Multimodal Data Refinery, Multilingual E5 ONNX + SQLite FTS5 RAG, Agent Context Firewall & MCP Server"
+version = "3.1.0"
+description = "Privacy-First Multimodal Data Refinery, Offline Vietnamese OCR, Multilingual E5 ONNX + SQLite FTS5 RAG, Agent Context Firewall & MCP Server"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
@@ -34,10 +34,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+ocr = ["pypdfium2>=5.0.0", "rapidocr-onnxruntime>=1.3.0"]
 directml = ["onnxruntime-directml>=1.19.0"]
 cuda = ["onnxruntime-gpu>=1.19.0"]
 openvino = ["onnxruntime-openvino>=1.19.0"]
 coreml = ["onnxruntime-silicon>=1.16.0; sys_platform == 'darwin'"]
+all = ["onnxruntime-directml>=1.19.0", "pypdfium2>=5.0.0", "rapidocr-onnxruntime>=1.3.0"]
 dev = ["pytest>=8.0.0", "httpx>=0.27.0"]
 
 [project.scripts]
