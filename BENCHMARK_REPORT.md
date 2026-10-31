@@ -13,8 +13,8 @@
 | System | Recall@1 (95% Wilson CI) | Recall@3 (95% Wilson CI) | MRR@5 | Avg Latency (ms/query) |
 | :--- | :---: | :---: | :---: | :---: |
 | **BM25-only (Surface Lexical)** | `50.0%` (`[28.0%, 72.0%]`) | `62.5%` (`[38.6%, 81.5%]`) | `0.5677` | `0.07 ms` |
-| **v2.1 (MiniLM-L6 + In-Memory BM25 RRF)** | `62.5%` (`[38.6%, 81.5%]`) | `81.2%` (`[57.0%, 93.4%]`) | `0.7104` | `3.51 ms` |
-| **v3.0 (E5-small ONNX + SQLite FTS5 + Breadcrumb + VNI/TCVN3)** | `87.5%` (`[64.0%, 96.5%]`) | `93.8%` (`[71.7%, 98.9%]`) | `0.8958` | `5.67 ms` |
+| **v2.1 (MiniLM-L6 + In-Memory BM25 RRF)** | `62.5%` (`[38.6%, 81.5%]`) | `81.2%` (`[57.0%, 93.4%]`) | `0.7104` | `2.92 ms` |
+| **v3.0 (E5-small ONNX + SQLite FTS5 + Breadcrumb + VNI/TCVN3)** | `87.5%` (`[64.0%, 96.5%]`) | `93.8%` (`[71.7%, 98.9%]`) | `0.8958` | `5.33 ms` |
 
 ### Track B Breakdown by Query Category (`v3.0 E5-small + SQLite FTS5`)
 
@@ -35,4 +35,4 @@
 | **Payload Sanitization Rate** | `100.0%` | `[77.2%, 100.0%]` | `>= 90.0%` |
 | **Hard-Negative False Positive Rate (FPR)** | `0.0%` | `[0.0%, 49.0%]` | `<= 5.0%` (0% ideal) |
 | **Benign Content Preservation Rate** | `100.0%` | — | `100.0%` |
-| **Firewall Overhead Latency** | `0.22 ms/doc` | — | `< 25.0 ms/doc` |
+| **Firewall Overhead Latency** | `0.21 ms/doc` | — | `< 25.0 ms/doc` |

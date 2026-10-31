@@ -122,6 +122,14 @@ class HybridWebExtractor:
                 )
 
         soup = BeautifulSoup(cleaned_html, "html.parser")
+        parsed_base = urlparse(url)
+        base_origin = f"{parsed_base.scheme}://{parsed_base.netloc}"
+        for tag in soup.find_all(["img", "a"]):
+            for attr in ("src", "href"):
+                val = tag.get(attr)
+                if isinstance(val, str) and val.startswith("/") and not val.startswith("//"):
+                    tag[attr] = base_origin + val
+        cleaned_html = str(soup)
 
         # Step 2: Extract main content via Trafilatura
         extracted_text = trafilatura.extract(
@@ -165,7 +173,19 @@ class HybridWebExtractor:
             from playwright.sync_api import sync_playwright
 
             with sync_playwright() as p:
-                browser = p.chromium.launch(headless=True)
+                browser = None
+                for ch in (None, "chrome", "msedge"):
+                    try:
+                        browser = (
+                            p.chromium.launch(headless=True)
+                            if ch is None
+                            else p.chromium.launch(channel=ch, headless=True)
+                        )
+                        break
+                    except Exception:
+                        continue
+                if browser is None:
+                    raise RuntimeError("No headless Chromium/Chrome/Edge binary available")
                 page = browser.new_page(user_agent=DEFAULT_HEADERS["User-Agent"])
                 page.goto(url, wait_until="domcontentloaded", timeout=15000)
 

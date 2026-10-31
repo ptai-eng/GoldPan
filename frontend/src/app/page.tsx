@@ -695,7 +695,23 @@ export default function Home() {
                     transition={{ duration: 0.4 }}
                     className="markdown-body max-w-3xl mx-auto"
                   >
-                    <ReactMarkdown>{result.markdown}</ReactMarkdown>
+                    <ReactMarkdown
+                      components={{
+                        img: ({ node, ...props }) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            {...props}
+                            alt={props.alt || ""}
+                            className="rounded-xl border border-border/60 my-4 max-h-72 object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = "none";
+                            }}
+                          />
+                        ),
+                      }}
+                    >
+                      {result.markdown}
+                    </ReactMarkdown>
                   </motion.div>
                 )}
               </div>

@@ -24,10 +24,24 @@ class HeuristicFilter:
 
     def apply(self, content: RawContent | FilteredContent) -> FilteredContent:
         text = content.text
+        noise_removed_bytes = 0
+
+        # Strip decorative HTML <div align="center">...</div> badge/banner blocks outside code fences
+        def _strip_center_div(match: re.Match) -> str:
+            nonlocal noise_removed_bytes
+            block = match.group(0)
+            noise_removed_bytes += len(block.encode("utf-8"))
+            return ""
+
+        text = re.sub(
+            r"(?is)<div\s+align=[\"']center[\"']\s*>.*?</div>\s*(?:---\s*)?",
+            _strip_center_div,
+            text,
+        )
+
         lines = text.split("\n")
 
         filtered_lines = []
-        noise_removed_bytes = 0
         in_code_fence = False
 
         for line in lines:

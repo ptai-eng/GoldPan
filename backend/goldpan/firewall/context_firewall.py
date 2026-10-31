@@ -384,15 +384,21 @@ class AgentContextFirewall:
             if self.mode == "sanitize":
                 out = _RE_BIDI_ZW.sub("", out)
 
-        # 3. Fake ChatML / Llama / System delimiters
-        if _RE_FAKE_CHAT_TOKENS.search(out):
+        # 3. Fake ChatML / Llama / System delimiters (ignoring inline code documentation examples like `<|im_start|>`)
+        out_without_inline_code = re.sub(r"`[^`\n]{1,40}`", "", out)
+        if _RE_FAKE_CHAT_TOKENS.search(out_without_inline_code):
             if "fake_chat_delimiter" not in signals:
                 signals.append("fake_chat_delimiter")
             sanitized_count += 1
             risk_score = max(risk_score, 0.9)
             if self.mode == "sanitize":
                 out = _RE_FAKE_CHAT_BLOCKS.sub("", out)
-                out = _RE_FAKE_CHAT_TOKENS.sub("", out)
+                out = re.sub(
+                    r"(?<!`)(?:<\|im_start\|>\s*(?:system|user|assistant)?|<\|im_end\|>|\[INST\]|\[/INST\]|<<SYS>>|<</SYS>>|<\|system\|>|<\|endoftext\|>)(?!`)",
+                    "",
+                    out,
+                    flags=re.IGNORECASE,
+                )
 
         # 4. Markdown image exfiltration beacons
         exfil_matches = _RE_MD_EXFIL_BEACON.findall(out)
