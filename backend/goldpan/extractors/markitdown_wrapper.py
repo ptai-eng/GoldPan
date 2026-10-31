@@ -1,14 +1,19 @@
 import os
-from markitdown import MarkItDown, DocumentConverter, DocumentConverterResult
-from goldpan.core.schemas import RawContent, DocumentInfo
+
+from bs4 import BeautifulSoup
+from markitdown import DocumentConverter, DocumentConverterResult, MarkItDown
+
+from goldpan.core.schemas import DocumentInfo, RawContent
+from goldpan.firewall.context_firewall import AgentContextFirewall
 from goldpan.vision.hybrid_captioner import HybridVisionCaptioner
 
 
 class GeminiMultimodalConverter(DocumentConverter):
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str | None = None) -> None:
         self.api_key = api_key
         if self.api_key:
             from google import genai
+
             self.client = genai.Client(api_key=self.api_key)
         else:
             self.client = None
@@ -66,20 +71,71 @@ class GeminiMultimodalConverter(DocumentConverter):
 
 
 class MarkItDownExtractor:
-    def __init__(self, api_key: str = None):
+    def __init__(self, api_key: str | None = None, firewall_mode: str = "sanitize") -> None:
         self.md_client = MarkItDown()
         self.api_key = api_key
+        self.firewall_mode = firewall_mode
+        self.firewall = AgentContextFirewall(mode=firewall_mode)
         self.md_client.register_converter(GeminiMultimodalConverter(self.api_key), priority=-1.0)
 
     def extract(self, source: str) -> RawContent:
         if not os.path.exists(source):
             raise FileNotFoundError(f"Source file not found: {source}")
 
+        ext = os.path.splitext(source)[1].lower()
+        fw_meta = {}
+
+        if ext == ".pdf":
+            stealth_clean_text, fw_report = self.firewall.inspect_pdf_stealth(source)
+            fw_meta = {"firewall": fw_report.model_dump()}
+            if stealth_clean_text is not None and self.firewall_mode == "sanitize":
+                doc_info = DocumentInfo(
+                    file_path=source,
+                    title=os.path.basename(source),
+                    metadata=fw_meta,
+                )
+                return RawContent(
+                    text=stealth_clean_text,
+                    doc_info=doc_info,
+                    original_format="pdf",
+                )
+        elif ext == ".docx":
+            vanish_clean_text, fw_report = self.firewall.inspect_docx_vanish(source)
+            fw_meta = {"firewall": fw_report.model_dump()}
+            if vanish_clean_text is not None and self.firewall_mode == "sanitize":
+                doc_info = DocumentInfo(
+                    file_path=source,
+                    title=os.path.basename(source),
+                    metadata=fw_meta,
+                )
+                return RawContent(
+                    text=vanish_clean_text,
+                    doc_info=doc_info,
+                    original_format="docx",
+                )
+        elif ext in (".html", ".htm"):
+            with open(source, "r", encoding="utf-8", errors="ignore") as f:
+                raw_html = f.read()
+            cleaned_html, fw_report = self.firewall.process_html(raw_html)
+            fw_meta = {"firewall": fw_report.model_dump()}
+            soup = BeautifulSoup(cleaned_html, "html.parser")
+            doc_info = DocumentInfo(
+                file_path=source,
+                title=os.path.basename(source),
+                metadata=fw_meta,
+            )
+            return RawContent(
+                text=soup.get_text(separator="\n", strip=True),
+                doc_info=doc_info,
+                original_format="html",
+            )
+
         result = self.md_client.convert(source)
 
         doc_info = DocumentInfo(
             file_path=source,
             title=os.path.basename(source),
+            metadata=fw_meta,
         )
 
         return RawContent(

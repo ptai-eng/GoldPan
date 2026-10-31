@@ -1,0 +1,53 @@
+name: GoldPan AI v3.0 CI & Benchmark Gate
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test-and-bench:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run GoldPan Doctor Hardware & Collection Diagnostics
+        run: |
+          python -m goldpan.cli doctor
+
+      - name: Run Full Unit, API, MCP & Security Test Suite
+        run: |
+          python run_tests.py
+          python backend/tests/test_api.py
+
+      - name: Run GoldPan Bench Dual-Track Evaluation & CI Regression Gate
+        run: |
+          python -m goldpan.cli bench --ci-gate --output-md BENCHMARK_REPORT.md --output-json benchmark_results.json
+
+      - name: Upload Benchmark Report Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldpan-bench-report-${{ matrix.os }}
+          path: |
+            BENCHMARK_REPORT.md
+            benchmark_results.json

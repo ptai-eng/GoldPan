@@ -1,15 +1,18 @@
 import re
 from urllib.parse import urlparse
+
 import requests
 import trafilatura
 from bs4 import BeautifulSoup
-from goldpan.core.schemas import RawContent, DocumentInfo
+
+from goldpan.core.schemas import DocumentInfo, RawContent
+from goldpan.firewall.context_firewall import AgentContextFirewall
 
 DEFAULT_HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/131.0.0.0 Safari/537.36 GoldPanAI/2.0"
+        "Chrome/131.0.0.0 Safari/537.36 GoldPanAI/3.0"
     ),
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
@@ -20,8 +23,14 @@ YOUTUBE_ID_PATTERN = re.compile(
 
 
 class HybridWebExtractor:
-    def __init__(self, use_playwright_fallback: bool = True):
+    def __init__(
+        self,
+        use_playwright_fallback: bool = True,
+        firewall_mode: str = "sanitize",
+    ) -> None:
         self.use_playwright_fallback = use_playwright_fallback
+        self.firewall_mode = firewall_mode
+        self.firewall = AgentContextFirewall(mode=firewall_mode)
 
     def _validate_url(self, url: str) -> str:
         parsed = urlparse(url.strip())
@@ -49,7 +58,6 @@ class HybridWebExtractor:
             try:
                 transcript = transcript_list.find_transcript(["en", "vi"])
             except Exception:
-                # Fallback to first available transcript in any language
                 transcript = next(iter(transcript_list))
             data = transcript.fetch()
             text = "\n".join([getattr(t, "text", str(t)) for t in data])
@@ -65,14 +73,12 @@ class HybridWebExtractor:
         if yt_id:
             return self._extract_youtube(url, yt_id)
 
-        # Basic GitHub blob to raw conversion
         if "github.com" in url and "/blob/" in url:
             url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
 
         html = ""
         soup = None
 
-        # Step 1: Try fast HTTP request with browser User-Agent
         try:
             response = requests.get(url, headers=DEFAULT_HEADERS, timeout=12)
             response.raise_for_status()
@@ -95,17 +101,22 @@ class HybridWebExtractor:
             else:
                 raise req_err
 
+        # Step 1.5: Agent Context Firewall HTML/CSS DOM sanitization BEFORE Trafilatura
+        cleaned_html, fw_report = self.firewall.process_html(html)
+        soup = BeautifulSoup(cleaned_html, "html.parser")
+
         # Step 2: Extract main content via Trafilatura
         extracted_text = trafilatura.extract(
-            html,
+            cleaned_html,
             include_links=True,
             include_images=True,
             include_tables=True,
         )
 
-        # Fallback if Trafilatura returns empty (e.g. raw code/markdown files)
         if not extracted_text:
-            extracted_text = soup.get_text(separator="\n", strip=True) if soup is not None else html
+            extracted_text = (
+                soup.get_text(separator="\n", strip=True) if soup is not None else cleaned_html
+            )
 
         if not extracted_text or not extracted_text.strip():
             raise ValueError(f"No readable text content could be extracted from {url}")
@@ -114,7 +125,11 @@ class HybridWebExtractor:
         if soup is not None and soup.title and soup.title.string:
             title = soup.title.string.strip()
 
-        doc_info = DocumentInfo(source_url=url, title=title)
+        doc_info = DocumentInfo(
+            source_url=url,
+            title=title,
+            metadata={"firewall": fw_report.model_dump()},
+        )
         return RawContent(
             text=extracted_text,
             doc_info=doc_info,

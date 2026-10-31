@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "goldpan"
-version = "2.1.0"
-description = "Privacy-First Multimodal Data Refinery, Dual-Mode Local ONNX RAG & Model Context Protocol (MCP) Server"
+version = "3.0.0"
+description = "Privacy-First Multimodal Data Refinery, Multilingual E5 ONNX + SQLite FTS5 RAG, Agent Context Firewall & MCP Server"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
@@ -33,13 +33,24 @@ dependencies = [
     "rich>=13.0.0",
 ]
 
+[project.optional-dependencies]
+directml = ["onnxruntime-directml>=1.19.0"]
+cuda = ["onnxruntime-gpu>=1.19.0"]
+openvino = ["onnxruntime-openvino>=1.19.0"]
+coreml = ["onnxruntime-silicon>=1.16.0; sys_platform == 'darwin'"]
+dev = ["pytest>=8.0.0", "httpx>=0.27.0"]
+
 [project.scripts]
 goldpan = "goldpan.cli:app"
 goldpan-mcp = "goldpan.mcp_server:main"
 
 [tool.setuptools]
 package-dir = {"" = "backend"}
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["backend"]
 include = ["goldpan*"]
+
+[tool.setuptools.package-data]
+"goldpan.bench.datasets" = ["*.json"]

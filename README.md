@@ -7,109 +7,125 @@
     <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+"/></a>
     <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"/></a>
     <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" alt="Next.js 16"/></a>
-    <a href="https://www.trychroma.com/"><img src="https://img.shields.io/badge/ChromaDB-ONNX_%2B_Cloud-FACC15?style=for-the-badge&logoColor=black" alt="ChromaDB"/></a>
-    <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP_Server-stdio_JSON--RPC-EAB308?style=for-the-badge&logoColor=black" alt="MCP Server"/></a>
+    <a href="https://www.trychroma.com/"><img src="https://img.shields.io/badge/ChromaDB_%2B_SQLite_FTS5-Multilingual_E5_ONNX-FACC15?style=for-the-badge&logoColor=black" alt="ChromaDB + SQLite FTS5"/></a>
+    <a href="https://modelcontextprotocol.io/"><img src="https://img.shields.io/badge/MCP_Server-Context_Firewall-EAB308?style=for-the-badge&logoColor=black" alt="MCP Server"/></a>
     <a href="#-dual-mode-operation"><img src="https://img.shields.io/badge/AI_Integration-Supported-8B5CF6?style=for-the-badge" alt="AI Integration Supported"/></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-22C55E?style=for-the-badge" alt="MIT License"/></a>
   </p>
 
   <p>
-    <a href="#-why-goldpan-ai">Why GoldPan</a> •
-    <a href="#-system-architecture">Architecture</a> •
-    <a href="#-dual-mode-operation">Dual-Mode Engine</a> •
+    <a href="#-why-goldpan-ai-v30">Why GoldPan v3.0</a> •
+    <a href="#-three-core-pillars-of-v30">v3.0 Core Pillars</a> •
+    <a href="#-3-tier-hardware-aware-onnx-acceleration">GPU Tiers</a> •
+    <a href="#-goldpan-bench-empirical-evaluation">Benchmarks</a> •
     <a href="#-cli--model-context-protocol-mcp-server">CLI & MCP Server</a> •
-    <a href="#-workspace-tour">Workspace Tour</a> •
     <a href="#-quick-start">Quick Start</a> •
-    <a href="#-api-reference">API Reference</a>
+    <a href="#-roadmap-v31--v32">Roadmap</a>
   </p>
 </div>
 
 ---
 
-## ⚡ Why GoldPan AI?
+## ⚡ Why GoldPan AI v3.0?
 
-Modern RAG pipelines fail before embedding even begins: PDFs arrive with broken tables, web pages carry 60% navigation and ad boilerplate, and naive character-slicing cuts code blocks and tables in half.
+Modern RAG pipelines and MCP tool servers fail before embedding even begins: PDFs arrive with broken tables, web pages carry 60% navigation boilerplate or hidden **Indirect Prompt Injection** payloads, and English-centric embedding models fail on Vietnamese legal/technical documents (especially legacy **TCVN3 / VNI-Windows** encodings and unaccented queries).
 
-**GoldPan AI** is a local-first multimodal data refinery, RAG workspace, CLI, and **Model Context Protocol (MCP) server** built to **sift pure signal ("gold") from noisy unstructured inputs**:
+**GoldPan AI v3.0** is a local-first multimodal data refinery, **Multilingual E5 ONNX + SQLite FTS5** hybrid RAG workspace, **Agent Context Firewall**, and **Model Context Protocol (MCP) server** built to **sift pure signal ("gold") from noisy and untrusted inputs**:
 
-- **Universal Ingestion:** Converts PDFs, Word (`.docx`), Excel/CSV, JSON, XML, Markdown, Images (`.jpg`, `.png`, `.webp`), Audio (`.mp3`, `.wav`, `.m4a`), YouTube videos, GitHub blobs, and JavaScript-heavy web pages into clean, structured Markdown.
-- **Two-Stage Noise Refinery:** Strips menus, cookie banners, and marketing boilerplate using deterministic regex rules (`HeuristicFilter`) followed by an optional 10-thread parallel `gemini-2.5-flash` cleanser (`SemanticRouterFilter`).
-- **True Dual-Mode Vector Storage:** Runs **100% offline out of the box** using local ONNX embeddings (`all-MiniLM-L6-v2`, 384-dim) in `ChromaDB` with zero API keys required—while seamlessly unlocking cloud-scale `gemini-embedding-001` (with exponential backoff against HTTP 429 limits) and multi-turn generative RAG when a Gemini API key is configured.
-- **Native CLI & MCP Server (`goldpan` & `goldpan-mcp`):** Use GoldPan directly from the terminal or plug it into **Claude Desktop, Claude Code, Cursor, Windsurf, or Antigravity** as a `stdio` MCP tool provider with strict context-window budgets (`detail: "summary" | "complete"`), explicit `coverage`, and untrusted-content provenance tags (`_meta.provenance.untrusted_content = true`).
-- **Human-Auditable `KB/*.md` Mirror:** Every ingested document is saved both as semantic chunks in ChromaDB and as a clean physical `.md` file inside `KB/` for Git versioning, Obsidian/IDE inspection, or external agent consumption.
+- **Pillar B — Multilingual & Vietnamese First-Class Core:** Upgrades local dense retrieval to **`intfloat/multilingual-e5-small` (384-dim ONNX)** with automatic `"query: "` / `"passage: "` prefixing, backed by a **persistent SQLite FTS5 (`goldpan_fts.db`)** lexical index (`bm25()` with `đ/Đ -> d` diacritic folding and compound bigrams), automatic **TCVN3 (ABC) & VNI-Windows -> Unicode NFC** conversion, and a **Hierarchical Breadcrumb Chunker** (`Phần > Chương > Mục > Điều > Khoản`).
+- **Pillar A — Agent Context Firewall (`sanitize` | `audit` | `strict`):** Defends downstream LLM agents against Indirect Prompt Injection (`OWASP LLM01`) across HTML/CSS DOM (`display:none`, `opacity:0`, `font-size:0`, white-on-white, off-screen positioning, HTML comments), PDF character attributes (`<1pt` / white fill via `pdfplumber`), DOCX vanished runs (`<w:vanish/>`), Unicode Tags (`U+E0000`–`U+E007F`), Bidi overrides, fake ChatML/Llama delimiters (`<|im_start|>`, `[INST]`), and Markdown image exfiltration beacons—while preserving **0% False Positive Rate (FPR)** on legitimate OWASP/cybersecurity papers. See [`THREAT_MODEL.md`](THREAT_MODEL.md).
+- **Pillar C — Reproducible `GoldPan Bench` & CI Gate:** Built-in dual-track benchmark (`goldpan bench --ci-gate`) evaluating retrieval (`Recall@1`, `Recall@3`, `MRR@5`) and firewall security (`TPR`, `Sanitization Rate`, `Hard-Negative FPR`) with **95% Wilson Score Confidence Intervals**.
 
 ---
 
-## 🏗️ System Architecture
+## 🏛️ Three Core Pillars of v3.0
 
 <div align="center">
   <img src="assets/goldpan-architecture.png" alt="GoldPan AI System Architecture" width="100%"/>
 </div>
 
-The backend pipeline (`backend/goldpan/`) is organized into four decoupled layers:
+### 1. Multilingual & Vietnamese Hybrid RAG Engine (`backend/goldpan/kb/`)
+- **Multilingual E5 ONNX (`onnx_embedder.py`):** Enforces the asymmetric E5 contract (`passage: ...` on indexing, `query: ...` on search) with L2 normalization in isolated collection `goldpan_kb_e5_v3`.
+- **Persistent SQLite FTS5 (`fts_index.py`):** Eliminates `O(N)` in-memory corpus rebuilds by persisting `text_nfc` and `text_folded` in `chroma_data/goldpan_fts.db` (`WAL` mode) and fusing FTS5 `bm25()` with dense vectors via Reciprocal Rank Fusion (`RRF, k=60`).
+- **Legacy Vietnamese Encoding Decoder (`vn_encoding.py`):** Detects and converts **VNI-Windows**, **TCVN3 (ABC)**, and decomposed **Unicode NFD** into composed **Unicode NFC** at the token level.
+- **Hierarchical Breadcrumb Chunker (`chunker.py`):** Tracks both Markdown (`# H1 > ## H2 > ### H3`) and Vietnamese statutory structure (`Phần > Chương > Mục > Điều > Khoản`), prepending `[Ngữ cảnh: ...]` to every chunk and extracting `so_hieu`, `ngay_ban_hanh`, and `loai_van_ban`.
 
-1. **Extractors (`goldpan/extractors/` & `goldpan/vision/`):**
-   - `MarkItDownExtractor` — Microsoft MarkItDown engine extended with `GeminiMultimodalConverter` (priority `-1.0`) and `HybridVisionCaptioner` (local Pillow EXIF/geometry inspection + cloud OCR/transcription).
-   - `LiteParseExtractor` — Zero-overhead parser for structured `.csv` (auto-converted to Markdown tables), `.json`, `.xml`, `.md`, and `.txt`.
-   - `HybridWebExtractor` — Direct YouTube transcript retrieval (`youtube-transcript-api`), GitHub blob-to-raw translation, `Trafilatura` main-text extraction, and automatic headless Chromium fallback (`Playwright`) when DOM text is under 500 characters.
-2. **Refinery Filters (`goldpan/filters/`):**
-   - `HeuristicFilter` — Fast line-level boilerplate stripping (cookie notices, newsletter prompts, standalone nav links) with byte-level telemetry.
-   - `SemanticRouterFilter` — Splits large documents into 15,000-character blocks and processes up to 10 chunks concurrently via `ThreadPoolExecutor` at `temperature=0.0` (or falls back to local paragraph-density heuristics when offline).
-3. **Formatter (`goldpan/formatters/`):**
-   - `AIFriendlyMarkdownFormatter` — Normalizes Unicode to NFC (unifying decomposed Vietnamese diacritics), formats ATX headings outside code fences, collapses excessive whitespace, injects missing document titles, and forwards noise-reduction metrics.
-4. **Dual-Mode Hybrid Knowledge Base (`goldpan/kb/chroma_manager.py`):**
-   - **Idempotent Content-Hash Deduplication (`compute_document_id`)** ensures re-ingesting the same document updates vectors and `KB/*.md` mirrors in place without creating duplicates.
-   - **Fence-Preserving Semantic Chunker** preserves paragraph boundaries, headings, fenced code blocks, and tables before slicing.
-   - **3-Signal Reciprocal Rank Fusion (RRF):** Fuses rankings across `goldpan_kb_local` (384d ONNX), `goldpan_kb_gemini` (768d Matryoshka L2-normalized `gemini-embedding-001`), and a **Vietnamese-aware BM25 + Diacritic-Folded Lexical Ranker** so cross-space distances are never compared directly and offline Vietnamese queries work with or without tone marks.
+### 2. Agent Context Firewall (`backend/goldpan/firewall/context_firewall.py`)
+- **Deterministic Structural & Steganographic Stripping (`sanitize` default):** Strips hidden DOM nodes *before* Trafilatura text extraction, filters `<1pt`/white PDF characters and DOCX `<w:vanish/>` runs, removes Unicode Tag (`U+E0000`–`U+E007F`) and Bidi/Zero-Width characters, neutralizes `<|im_start|>`/`[INST]` delimiters, and blocks Markdown image exfiltration beacons.
+- **Context-Aware Semantic Risk Scoring:** Flags imperative override payloads (`risk_score` `0.0–1.0`, `signals`) in English and Vietnamese while distinguishing academic/educational security discussions (Hard Negatives) so visible prose is never blindly corrupted.
+- **MCP Data Spotlighting:** Optional `<untrusted_document_content source="..." firewall_mode="..." risk_score="...">` wrapping + `_meta.provenance.firewall` telemetry.
+
+### 3. 3-Tier Hardware-Aware ONNX Acceleration (`goldpan doctor`)
+
+| Tier | Target Hardware | Package / Extra | ONNX Provider & Config | Verification Status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Tier 1 (Default)** | Any x86_64 / ARM64 CPU | `pip install goldpan` | `CPUExecutionProvider` (`INT8`, `batch_size=32`) | **CI-Verified** (Linux & Windows) |
+| **Tier 2 (Windows GPU)** | **AMD Radeon RX 6600 (RDNA 2)**, **RX 5000 (RDNA 1)**, RX 7000, Intel Arc, NVIDIA DX12 | `pip install "goldpan[directml]"` | `DmlExecutionProvider` (`FP32`, bounded `batch_size=12` + warmup fallback) | **Hardware-Verified** on Windows + AMD RX 6600 (8GB VRAM) |
+| **Tier 3 (Community Extras)** | NVIDIA CUDA / Intel OpenVINO / Apple Silicon | `goldpan[cuda]` / `goldpan[openvino]` / `goldpan[coreml]` | Respective provider with automatic fallback to `CPUExecutionProvider` | **Community-Tested** (CI promotion in `v3.1`) |
 
 ---
 
-## 🔀 Dual-Mode Operation
+## 📊 `GoldPan Bench` Empirical Evaluation
 
-GoldPan AI never locks you out when you work offline or hit free-tier API quotas:
+Reproduce at any time with `goldpan bench --ci-gate` (dataset SHA-256 hashes verified automatically; see [`BENCHMARK_REPORT.md`](BENCHMARK_REPORT.md)):
 
-| Capability | 🔒 Local Offline Mode (No API Key) | ⚡ Gemini Cloud Turbo Mode (`X-Gemini-Api-Key`) |
-| :--- | :--- | :--- |
-| **Documents & Structured Files** | `MarkItDown` + `LiteParse` (100% Local) | `MarkItDown` + `LiteParse` (100% Local) |
-| **Dynamic Web & YouTube** | `Trafilatura` + `Playwright` + `YouTubeTranscriptApi` | `Trafilatura` + `Playwright` + `YouTubeTranscriptApi` |
-| **Images (`.jpg`, `.png`, `.webp`)** | Local Pillow resolution, color mode & EXIF inspector | Full `gemini-2.5-flash` Vision OCR, table & scene extraction |
-| **Audio (`.mp3`, `.wav`, `.m4a`)** | Requires API Key | Native `gemini-2.5-flash` multimodal transcription |
-| **Refinery Filter** | `HeuristicFilter` + Local Paragraph Density Router | `HeuristicFilter` + 10-Thread `gemini-2.5-flash` Cleanser |
-| **Vector Embeddings (ChromaDB)** | **Local ONNX `all-MiniLM-L6-v2` (384d) + Vietnamese BM25** | `gemini-embedding-001` (`outputDimensionality=768`, L2-norm) + RRF |
-| **Knowledge Base Querying** | 3-Signal RRF Extractive Retrieval + Citations | 3-Signal RRF + Multi-Turn Grounded RAG Synthesis |
+### Track B: Multilingual & Vietnamese Hybrid Retrieval (`16` Held-Out Queries across `4` Categories)
+
+| System | Recall@1 (95% Wilson CI) | Recall@3 (95% Wilson CI) | MRR@5 | Avg Latency |
+| :--- | :---: | :---: | :---: | :---: |
+| **BM25-only (Surface Lexical)** | `50.0%` (`[28.0%, 72.0%]`) | `62.5%` (`[38.6%, 81.5%]`) | `0.5677` | `0.06 ms` |
+| **v2.1 (MiniLM-L6 + In-Memory BM25 RRF)** | `68.8%` (`[44.4%, 85.8%]`) | `81.2%` (`[57.0%, 93.4%]`) | `0.7417` | `3.56 ms` |
+| **v3.0 (E5-small ONNX + SQLite FTS5 + Breadcrumb + VNI/TCVN3)** | **`87.5%`** (`[64.0%, 96.5%]`) | **`93.8%`** (`[71.7%, 98.9%]`) | **`0.8958`** | `5.62 ms` |
+
+- **`vi_accented` / `vi_unaccented` / `vi_paraphrase`:** `100.0%` Recall@1 & Recall@3 (`MRR@5 = 1.0000`), including legacy VNI-Windows (`Boä Luaät Lao Ñoäng`) and TCVN3 (`Thông tư 80/2021/TT-BTC`) documents.
+- **`cross_lingual_en_vi`:** `75.0%` Recall@3 (`[30.1%, 95.4%]` 95% Wilson CI).
+
+### Track A: Agent Context Firewall (`13` Multi-Vector Attacks + `4` Benign Hard Negatives)
+
+| Metric | Score | 95% Wilson Confidence Interval | Target Gate |
+| :--- | :---: | :---: | :---: |
+| **Attack Detection Rate (TPR)** | **`100.0%`** | `[77.2%, 100.0%]` | `>= 90.0%` |
+| **Payload Sanitization Rate** | **`100.0%`** | `[77.2%, 100.0%]` | `>= 90.0%` |
+| **Hard-Negative False Positive Rate (FPR)** | **`0.0%`** | `[0.0%, 49.0%]` | `<= 5.0%` (0% ideal) |
+| **Benign Content Preservation Rate** | **`100.0%`** | — | `100.0%` |
+| **Firewall Overhead Latency** | **`0.21 ms/doc`** | — | `< 25.0 ms/doc` |
 
 ---
 
 ## 🧰 CLI & Model Context Protocol (MCP) Server
 
-GoldPan v2.1 ships with an installable Python package (`pyproject.toml`) exposing both a rich terminal CLI (`goldpan`) and a standard `stdio` JSON-RPC 2.0 MCP Server (`goldpan-mcp`).
-
 ### 1. Command-Line Interface (`goldpan`)
 
 ```powershell
-# Install GoldPan in editable mode inside your virtual environment
+# Install GoldPan v3.0 (add [directml] on Windows with AMD RX 6600 / RX 5000 / DX12 GPUs)
 pip install -e .
+# pip install -e ".[directml]"
 
-# Extract clean Markdown from a URL or local file (defaults to summary budget)
-goldpan extract https://example.com --detail summary --max-chars 4000
+# 1. Diagnose hardware execution provider, warmup latency, SQLite FTS5 & v2->v3 migration status
+goldpan doctor
 
-# Extract full Markdown and save directly to a file + ingest into ChromaDB
-goldpan extract ./report.pdf --output ./clean_report.md --ingest
+# 2. Extract clean Markdown protected by the Agent Context Firewall (sanitize | audit | strict)
+goldpan extract https://example.com --firewall-mode sanitize --spotlight
 
-# Ingest any document or URL into the 100% offline Local ONNX Knowledge Base
-goldpan ingest ./architecture.docx --local
+# 3. Ingest documents into the v3 Multilingual E5 + SQLite FTS5 Knowledge Base
+goldpan ingest ./luat_so_huu_tri_tue.pdf --local
 
-# Run semantic vector search with distance scores and citations
-goldpan search "How does the dual-mode vector storage avoid dimension collisions?" --top-k 4
+# 4. Hybrid RRF search (supports accented, unaccented, paraphrased & cross-lingual queries)
+goldpan search "dieu 15 luat so huu tri tue khong bao ho quyen tac gia" --top-k 4
 
-# List or delete indexed Knowledge Base documents
-goldpan kb-list
-goldpan kb-delete <document_id>
+# 5. Re-index / migrate existing KB/*.md or v2 chunks into v3 E5 + SQLite FTS5
+goldpan reindex
+
+# 6. Audit all indexed Knowledge Base chunks for prompt injection signatures
+goldpan audit
+
+# 7. Run the reproducible Dual-Track Benchmark & CI Regression Gate
+goldpan bench --ci-gate --output-md BENCHMARK_REPORT.md
 ```
 
 ### 2. MCP Server (`goldpan-mcp`) for AI Coding Agents
 
-Register `goldpan-mcp` in **Claude Desktop**, **Claude Code**, **Cursor**, or **Antigravity** (`mcp_config.json` / `claude_desktop_config.json`):
+Register `goldpan-mcp` in **Claude Desktop**, **Claude Code**, **Cursor**, or **Antigravity**:
 
 ```json
 {
@@ -125,92 +141,29 @@ Register `goldpan-mcp` in **Claude Desktop**, **Claude Code**, **Cursor**, or **
 }
 ```
 
-#### Exposed MCP Tools & `rea-tool-design` Guarantees
-
-Every MCP tool response enforces **response-budget protection** (`detail: "summary" | "complete"`), **explicit coverage reporting** (`coverage.completeness`, `residual_unknowns`), and **untrusted-target provenance markers** (`_meta.provenance.untrusted_content = true`) to defend downstream agents against indirect prompt injection:
-
 | MCP Tool | Arguments | Description |
 | :--- | :--- | :--- |
-| `goldpan_extract` | `source`, `detail="summary"`, `max_chars=4000`, `ingest_to_kb=false` | Extracts clean Markdown from any URL, YouTube video, GitHub file, or local document with noise-removal telemetry. |
-| `goldpan_kb_ingest` | `markdown`, `title`, `source`, `prefer_local=true` | Chunks and indexes Markdown into ChromaDB (`local_onnx` 384d or `gemini` 768d) and writes a physical `KB/*.md` mirror. |
-| `goldpan_kb_search` | `query`, `n_results=4`, `detail="summary"` | Performs semantic vector search across ChromaDB and returns ranked passages with source citations and L2 distance scores. |
-| `goldpan_kb_list` | *(none)* | Lists all indexed documents, titles, sources, and chunk counts across local and cloud collections. |
-| `goldpan_kb_delete` | `document_id` | Deletes a document's vectors from ChromaDB and removes its physical `KB/*.md` file. |
-
-Plus native **MCP Resources** (`resources/list` and `resources/read`) exposing every indexed document at `goldpan://kb/<document_id>`.
+| `goldpan_extract` | `source`, `detail="summary"`, `max_chars=4000`, `ingest_to_kb=false`, `firewall_mode="sanitize"`, `spotlight=false` | Extracts clean Markdown protected by the Agent Context Firewall with `_meta.provenance.firewall` telemetry. |
+| `goldpan_kb_ingest` | `markdown`, `title`, `source`, `prefer_local=true` | Chunks with `HierarchicalBreadcrumbChunker`, indexes into `goldpan_kb_e5_v3` + SQLite FTS5, and saves `KB/*.md`. |
+| `goldpan_kb_search` | `query`, `n_results=4`, `detail="summary"`, `spotlight=false` | Runs Hybrid RRF search across Multilingual E5 (384d), SQLite FTS5 BM25, and Gemini (768d). |
+| `goldpan_kb_audit` | *(none)* | Scans all indexed chunks in the Knowledge Base using `AgentContextFirewall(mode="audit")`. |
+| `goldpan_doctor` | *(none)* | Returns hardware execution provider tier, warmup latency, FTS5 status, and v2->v3 migration health. |
+| `goldpan_kb_list` | *(none)* | Lists all indexed documents, titles, sources, and chunk counts. |
+| `goldpan_kb_delete` | `document_id` | Deletes a document's vectors and removes its physical `KB/*.md` file. |
 
 ---
 
 ## 🖥️ Workspace Tour
 
-Built with **Next.js 16**, **React 19**, **Tailwind CSS v4**, and **Framer Motion** in a high-contrast **Dark Stone & Gold (`#0C0A09` / `#FACC15`)** theme (with Light Mode and UI Zoom scaling built in).
-
-### 1. Data Cleansing & Extraction Engine
-Upload documents or paste URLs, monitor real-time elapsed progress, inspect the refined Markdown output, and export `.md` or commit directly to the Knowledge Base.
+Built with **Next.js 16**, **React 19**, **Tailwind CSS v4**, and **Framer Motion** in a high-contrast **Dark Stone & Gold (`#0C0A09` / `#FACC15`)** theme.
 
 ![GoldPan Extractor Engine](screenshot1.png)
-
-### 2. Knowledge Base & Grounded RAG Assistant
-Manage indexed documents (backed by both ChromaDB vectors and physical `KB/*.md` files) and run multi-turn queries grounded strictly in your ingested sources.
 
 ![GoldPan Knowledge Base Chat](screenshot.png)
 
 ---
 
-## 📂 Project Structure
-
-```text
-GoldPan/
-├── assets/
-│   ├── goldpan-hero-banner.png       # Flagship Dark Stone & Gold hero banner
-│   ├── goldpan-architecture.png      # High-DPI system architecture schematic
-│   └── goldpan-architecture.html     # Self-contained SVG source (diagram-design spec)
-├── backend/
-│   ├── goldpan/
-│   │   ├── core/
-│   │   │   ├── exceptions.py         # ExtractionError, FilterError, FormattingError
-│   │   │   ├── pipeline.py           # GoldPanPipeline orchestrator (Protocol-based)
-│   │   │   └── schemas.py            # Pydantic models: RawContent, FilteredContent, FinalMarkdown
-│   │   ├── extractors/
-│   │   │   ├── liteparse_wrapper.py  # Fast CSV->Markdown table, JSON, XML & TXT parser
-│   │   │   ├── markitdown_wrapper.py # Office/PDF parser + Gemini Multimodal converter
-│   │   │   └── web_extractor.py      # YouTube, GitHub raw, Trafilatura & Playwright fallback
-│   │   ├── filters/
-│   │   │   ├── heuristic_filter.py   # Regex boilerplate & nav-link stripper
-│   │   │   └── semantic_router.py    # 10-thread Gemini cleanser + local heuristic fallback
-│   │   ├── formatters/
-│   │   │   └── markdown_formatter.py # Heading & whitespace normalizer
-│   │   ├── kb/
-│   │   │   └── chroma_manager.py     # Dual-mode ONNX (384d) + Gemini (768d) vector manager
-│   │   ├── vision/
-│   │   │   └── hybrid_captioner.py   # Local Pillow EXIF inspector + Gemini Vision captioner
-│   │   ├── cli.py                    # Typer + Rich CLI (`goldpan extract|ingest|search|kb-list`)
-│   │   └── mcp_server.py             # stdio JSON-RPC 2.0 MCP Server (`goldpan-mcp`)
-│   ├── tests/                        # Sample fixtures (CSV, DOCX, PDF, MP3, JPG, XML) & API tests
-│   ├── main.py                       # FastAPI server (:8000)
-│   └── requirements.txt              # Backend Python dependencies (UTF-8)
-├── frontend/
-│   ├── src/app/
-│   │   ├── globals.css               # Dark Stone & Gold design tokens
-│   │   ├── layout.tsx                # Root layout & theme hydration script
-│   │   └── page.tsx                  # Extractor Workspace, KB Manager & RAG Chat SPA
-│   └── package.json                  # Next.js 16 + React 19 + Tailwind CSS v4
-├── KB/                               # Physical Markdown mirror of ingested documents
-├── pyproject.toml                    # Python package & CLI/MCP script entrypoints
-├── run_tests.py                      # End-to-end verification suite (pytest compatible)
-└── requirements.txt                  # Root Python dependencies
-```
-
----
-
 ## 🚀 Quick Start
-
-### Prerequisites
-- **Python 3.10+**
-- **Node.js 18+**
-- *(Optional)* A **Google Gemini API Key** — only needed if you want Cloud Multimodal Audio/Vision extraction and generative LLM synthesis; Local Extraction and Local ONNX Vector Search work out of the box without any key.
-
-### 1. Clone & Install Backend + CLI/MCP
 
 ```powershell
 git clone https://github.com/ptai-eng/GoldPan.git
@@ -221,56 +174,22 @@ python -m venv venv
 pip install -r requirements.txt
 pip install -e .
 
-# Optional: install Chromium for dynamic JavaScript-heavy web scraping fallback
-playwright install chromium
+# Run all 14 verification, security & benchmark suites
+.\venv\Scripts\python.exe run_tests.py
+.\venv\Scripts\python.exe backend/tests/test_api.py
 ```
-
-### 2. Install Frontend
-
-```powershell
-cd frontend
-npm install
-cd ..
-```
-
-### 3. Run the Verification Suite
-
-```powershell
-.\venv\Scripts\python.exe -m pytest run_tests.py -v
-```
-
-### 4. Launch Backend & Frontend
-
-**Terminal 1 — FastAPI Backend (`http://localhost:8000`):**
-```powershell
-.\venv\Scripts\activate
-cd backend
-uvicorn main:app --reload --port 8000
-```
-
-**Terminal 2 — Next.js Workspace (`http://localhost:3000`):**
-```powershell
-cd frontend
-npm run dev
-```
-
-Open **`http://localhost:3000`** in your browser. Use GoldPan immediately in **Local ONNX Offline Mode**, or click **Settings** in the bottom-left sidebar to add your `AIza...` Gemini API key for **Gemini 2.5 Turbo Mode**.
 
 ---
 
-## 🔌 API Reference
+## 🗺️ Roadmap (`v3.1` & `v3.2`)
 
-All endpoints are served by FastAPI at `http://localhost:8000` (interactive Swagger docs at `http://localhost:8000/docs`). Pass the optional header `X-Gemini-Api-Key: AIza...` to enable cloud features.
-
-| Method | Endpoint | Description |
-| :--- | :--- | :--- |
-| `POST` | `/api/extract/file` | Multipart file upload (`file`). Returns `{ markdown, metadata: { title, file_path, stats } }`. |
-| `POST` | `/api/extract/url` | JSON `{ "url": "https://..." }`. Extracts clean Markdown from articles, GitHub blobs, or YouTube URLs. |
-| `POST` | `/api/kb/ingest` | JSON `{ "markdown": "...", "metadata": {...}, "prefer_local": false }`. Saves physical `.md` to `KB/` and upserts vectors into ChromaDB. |
-| `GET` | `/api/kb/documents` | Lists all indexed documents across local ONNX and Gemini collections. |
-| `DELETE` | `/api/kb/documents/{id}` | Removes a document's vectors from ChromaDB and deletes its physical `.md` mirror from `KB/`. |
-| `POST` | `/api/kb/chat` | JSON `{ "message": "...", "history": [...] }`. Returns `{ response, context_used, citations, mode }`. |
-| `GET` | `/health` | Health check returning `{ "status": "ok", "version": "2.1.0" }`. |
+- **`v3.1` (Deferred Hardware CI & Offline Vietnamese OCR):**
+  - `goldpan[ocr]`: Offline Vietnamese scanned PDF/image OCR (`VietOCR` + `PaddleOCR-VL` / `Tesseract vie`) when `pdfplumber` detects `< 30` chars/page.
+  - Official GitHub Actions CI matrix runners for Apple Silicon (`CoreMLExecutionProvider`) and Intel (`OpenVINOExecutionProvider`).
+- **`v3.2` (Autonomous Verification & MCP-Native Engineering):**
+  - **Playwright MCP + Chrome DevTools MCP:** Automated E2E verification and runtime network/console profiling of the Next.js 16 RAG & Firewall UI (`http://localhost:3000` <-> `http://localhost:8000`) plus adversarial SPA DOM extraction tests.
+  - **Context7 MCP:** Version-pinned syntax verification for Next.js 16, React 19, Tailwind CSS v4, FastAPI, ChromaDB, and ONNX Runtime.
+  - **GitHub MCP Server:** Automated issue triage, branch creation, PR benchmark comment gating (`BENCHMARK_REPORT.md`), and release tagging.
 
 ---
 

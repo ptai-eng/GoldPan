@@ -1,0 +1,154 @@
+{
+  "version": "3.0.0",
+  "description": "Held-out frozen multilingual & Vietnamese legal/technical retrieval benchmark (Track B).",
+  "corpus": [
+    {
+      "doc_id": "doc_luat_shtt_dieu_14",
+      "source": "luat_so_huu_tri_tue_2022.md",
+      "text": "Phần thứ hai: QUYỀN TÁC GIẢ VÀ QUYỀN LIÊN QUAN\nChương I: ĐIỀU KIỆN BẢO HỘ QUYỀN TÁC GIẢ\nĐiều 14. Các loại hình tác phẩm được bảo hộ quyền tác giả\nKhoản 1. Tác phẩm văn học, nghệ thuật và khoa học được bảo hộ bao gồm tác phẩm văn học, khoa học, sách giáo khoa, giáo trình, bài giảng, chương trình máy tính và sưu tập dữ liệu."
+    },
+    {
+      "doc_id": "doc_luat_shtt_dieu_15",
+      "source": "luat_so_huu_tri_tue_2022.md",
+      "text": "Phần thứ hai: QUYỀN TÁC GIẢ VÀ QUYỀN LIÊN QUAN\nChương I: ĐIỀU KIỆN BẢO HỘ QUYỀN TÁC GIẢ\nĐiều 15. Các đối tượng không thuộc phạm vi bảo hộ quyền tác giả\nKhoản 1. Tin tức thời sự thuần túy đưa tin.\nKhoản 2. Văn bản quy phạm pháp luật, văn bản hành chính và các văn bản khác thuộc lĩnh vực tư pháp và bản dịch chính thức của văn bản đó.\nKhoản 3. Quy trình, hệ thống, phương pháp hoạt động, khái niệm, nguyên lý, số liệu."
+    },
+    {
+      "doc_id": "doc_nghi_dinh_30_van_thu",
+      "source": "nghi_dinh_30_2020_nd_cp.md",
+      "text": "Số: 30/2020/NĐ-CP\nNgày 05 tháng 03 năm 2020\nNGHỊ ĐỊNH Về công tác văn thư\nChương II: SOẠN THẢO VÀ KÝ BAN HÀNH VĂN BẢN HÀNH CHÍNH\nĐiều 8. Thể thức văn bản\nKhoản 1. Thể thức văn bản là tập hợp các thành phần cấu thành văn bản, bảo đảm cho văn bản có giá trị pháp lý và hiệu lực thi hành, bao gồm Quốc hiệu, Tiêu ngữ, tên cơ quan ban hành, số và ký hiệu của văn bản, căn lề trái 30mm, lề phải 15mm, lề trên và dưới 20mm."
+    },
+    {
+      "doc_id": "doc_luat_an_ninh_mang_dieu_26",
+      "source": "luat_an_ninh_mang_2018.md",
+      "text": "Luật số: 24/2018/QH14\nChương III: BẢO VỆ AN NINH MẠNG ĐỐI VỚI HỆ THỐNG THÔNG TIN\nĐiều 26. Bảo đảm an toàn thông tin trên không gian mạng\nKhoản 3. Doanh nghiệp trong và ngoài nước cung cấp dịch vụ trên mạng viễn thông, mạng Internet tại Việt Nam có hoạt động thu thập, khai thác, phân tích, xử lý dữ liệu thông tin cá nhân phải lưu trữ dữ liệu này tại Việt Nam trong thời gian theo quy định của Chính phủ."
+    },
+    {
+      "doc_id": "doc_vni_legacy_labor_contract",
+      "source": "hop_dong_lao_dong_vni.md",
+      "text": "Boä Luaät Lao Ñoäng Số: 45/2019/QH14\nChương III: HỢP ĐỒNG LAO ĐỘNG\nĐiều 35. Quyeàn ñôn phöông chaám döùt hôïp ñoàng lao ñoäng cuûa ngöôøi lao ñoäng\nKhoản 1. Ngöôøi lao ñoäng coù quyeàn ñôn phöông chaám döùt hôïp ñoàng lao ñoäng nhöng phaûi baùo tröôùc cho ngöôøi söû duïng lao ñoäng ít nhaát 45 ngaøy neáu laøm vieäc theo hôïp ñoàng lao ñoäng khoâng xaùc ñònh thôøi haïn."
+    },
+    {
+      "doc_id": "doc_tcvn3_legacy_tax_refund",
+      "source": "quy_dinh_hoan_thue_tcvn3.md",
+      "text": "Thông tư Số: 80/2021/TT-BTC\nĐiều 28. Hå s¬ hoµn thuÕ gi¸ trÞ gia t¨ng\nKhoản 2. Doanh nghiÖp xuÊt khÈu hµng hãa, dÞch vô ®­îc hoµn thuÕ gi¸ trÞ gia t¨ng ®Çu vµo ch­a khÊu trõ hÕt tõ ba trăm triÖu ®ång trë lªn trong th¸ng hoÆc quý."
+    },
+    {
+      "doc_id": "doc_ai_rag_firewall_arch",
+      "source": "goldpan_security_architecture.md",
+      "text": "# GoldPan AI Context Firewall\n## Layer 1: Structural & Steganographic Sanitization\nGoldPan defends LLM agents against indirect prompt injection by stripping invisible DOM nodes (`display:none`, `opacity:0`), PDF zero-point characters, DOCX vanished runs (`w:vanish`), and Unicode Tag steganography (`U+E0000`–`U+E007F`) before retrieval indexing."
+    },
+    {
+      "doc_id": "doc_hybrid_rrf_sqlite_fts5",
+      "source": "goldpan_hybrid_retrieval.md",
+      "text": "# Hybrid Retrieval Architecture\n## Reciprocal Rank Fusion with SQLite FTS5 & E5 ONNX\nGoldPan combines dense vector similarity from `intfloat/multilingual-e5-small` (384-d) with persistent lexical BM25 ranking in SQLite FTS5 (`goldpan_fts.db`) using Reciprocal Rank Fusion (RRF, k=60) and Vietnamese diacritic folding."
+    },
+    {
+      "doc_id": "doc_directml_gpu_tiering",
+      "source": "goldpan_gpu_acceleration.md",
+      "text": "# Hardware-Aware ONNX Acceleration\n## Tier 2: Windows DirectML (AMD Radeon RX 6600 & RX 5000)\nOn Windows systems with DirectX 12 GPUs, GoldPan routes `intfloat/multilingual-e5-small` through `DmlExecutionProvider` with bounded `batch_size=12` and automatic fallback to `CPUExecutionProvider` INT8 if warmup fails."
+    },
+    {
+      "doc_id": "doc_quy_che_hoc_vu_ai",
+      "source": "quy_che_dao_tao_tin_chi.md",
+      "text": "Quyết định Số: 112/QĐ-ĐHQG\nNgày 15 tháng 09 năm 2025\nChương IV: ĐÁNH GIÁ KẾT QUẢ HỌC TẬP\nĐiều 21. Xử lý vi phạm quy chế thi và đạo đức học thuật\nKhoản 2. Sinh viên sao chép mã nguồn hoặc nộp báo cáo khoa học có ngụy tạo trích dẫn (hallucinated citations) sẽ bị điểm 0 học phần và cảnh cáo học vụ."
+    }
+  ],
+  "queries": [
+    {
+      "query_id": "q01_vi_accented_shtt",
+      "category": "vi_accented",
+      "query": "Điều 15 Luật Sở hữu trí tuệ quy định những đối tượng nào không thuộc phạm vi bảo hộ quyền tác giả?",
+      "relevant_doc_ids": ["doc_luat_shtt_dieu_15"]
+    },
+    {
+      "query_id": "q02_vi_accented_nd30",
+      "category": "vi_accented",
+      "query": "Quy định căn lề văn bản hành chính tại Điều 8 Nghị định 30/2020/NĐ-CP về công tác văn thư như thế nào?",
+      "relevant_doc_ids": ["doc_nghi_dinh_30_van_thu"]
+    },
+    {
+      "query_id": "q03_vi_accented_cybersecurity",
+      "category": "vi_accented",
+      "query": "Nghĩa vụ lưu trữ dữ liệu thông tin cá nhân tại Việt Nam theo Điều 26 Luật An ninh mạng",
+      "relevant_doc_ids": ["doc_luat_an_ninh_mang_dieu_26"]
+    },
+    {
+      "query_id": "q04_vi_accented_academic",
+      "category": "vi_accented",
+      "query": "Hình thức xử lý sinh viên ngụy tạo trích dẫn báo cáo khoa học tại Điều 21",
+      "relevant_doc_ids": ["doc_quy_che_hoc_vu_ai"]
+    },
+    {
+      "query_id": "q05_vi_unaccented_shtt",
+      "category": "vi_unaccented",
+      "query": "dieu 15 luat so huu tri tue khong bao ho quyen tac gia doi voi van ban quy pham phap luat",
+      "relevant_doc_ids": ["doc_luat_shtt_dieu_15"]
+    },
+    {
+      "query_id": "q06_vi_unaccented_nd30",
+      "category": "vi_unaccented",
+      "query": "nghi dinh 30 cong tac van thu can le trai 30mm le phai 15mm dieu 8",
+      "relevant_doc_ids": ["doc_nghi_dinh_30_van_thu"]
+    },
+    {
+      "query_id": "q07_vi_unaccented_vni_labor",
+      "category": "vi_unaccented",
+      "query": "quyen don phuong cham dut hop dong lao dong bao truoc 45 ngay dieu 35",
+      "relevant_doc_ids": ["doc_vni_legacy_labor_contract"]
+    },
+    {
+      "query_id": "q08_vi_unaccented_tcvn3_tax",
+      "category": "vi_unaccented",
+      "query": "ho so hoan thue gia tri gia tang doanh nghiep xuat khau dieu 28",
+      "relevant_doc_ids": ["doc_tcvn3_legacy_tax_refund"]
+    },
+    {
+      "query_id": "q09_vi_paraphrase_labor_quit",
+      "category": "vi_paraphrase",
+      "query": "Nhân viên tự xin nghỉ việc khi ký hợp đồng vô thời hạn thì cần thông báo cho công ty trước bao lâu?",
+      "relevant_doc_ids": ["doc_vni_legacy_labor_contract"]
+    },
+    {
+      "query_id": "q10_vi_paraphrase_copyright_news",
+      "category": "vi_paraphrase",
+      "query": "Bản tin thời sự hàng ngày và văn bản luật của nhà nước có được đăng ký bản quyền tác giả không?",
+      "relevant_doc_ids": ["doc_luat_shtt_dieu_15"]
+    },
+    {
+      "query_id": "q11_vi_paraphrase_vat_export",
+      "category": "vi_paraphrase",
+      "query": "Công ty bán hàng ra nước ngoài có số thuế đầu vào chưa khấu trừ trên 300 triệu thì làm thủ tục hoàn lại thuế như thế nào?",
+      "relevant_doc_ids": ["doc_tcvn3_legacy_tax_refund"]
+    },
+    {
+      "query_id": "q12_vi_paraphrase_gpu_amd",
+      "category": "vi_paraphrase",
+      "query": "Tăng tốc suy luận mô hình nhúng trên card đồ họa AMD Radeon Windows bằng DirectML và tự động chuyển về CPU khi lỗi",
+      "relevant_doc_ids": ["doc_directml_gpu_tiering"]
+    },
+    {
+      "query_id": "q13_cross_lingual_en_to_vi_copyright",
+      "category": "cross_lingual_en_vi",
+      "query": "Which subjects are excluded from copyright protection such as pure news reports and legal administrative documents?",
+      "relevant_doc_ids": ["doc_luat_shtt_dieu_15"]
+    },
+    {
+      "query_id": "q14_cross_lingual_en_to_vi_data_localization",
+      "category": "cross_lingual_en_vi",
+      "query": "Personal data localization requirement in Vietnam for domestic and foreign internet service providers",
+      "relevant_doc_ids": ["doc_luat_an_ninh_mang_dieu_26"]
+    },
+    {
+      "query_id": "q15_cross_lingual_en_to_vi_labor_notice",
+      "category": "cross_lingual_en_vi",
+      "query": "How many days advance notice must an employee give to unilaterally terminate an indefinite-term labor contract?",
+      "relevant_doc_ids": ["doc_vni_legacy_labor_contract"]
+    },
+    {
+      "query_id": "q16_cross_lingual_vi_to_en_firewall",
+      "category": "cross_lingual_en_vi",
+      "query": "Cơ chế tường lửa loại bỏ mã độc ẩn trong thẻ HTML display:none, chữ ẩn w:vanish trong Word và ký tự tàng hình Unicode Tags",
+      "relevant_doc_ids": ["doc_ai_rag_firewall_arch"]
+    }
+  ]
+}

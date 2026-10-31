@@ -1,21 +1,23 @@
-"""GoldPan AI MCP Server (stdio JSON-RPC 2.0) following rea-tool-design contracts."""
+"""GoldPan AI MCP Server (stdio JSON-RPC 2.0) following rea-tool-design contracts & v3.0 Context Firewall."""
 
 import json
 import os
 import re
 import sys
-import uuid
 from typing import Any, Dict, List, Optional
 
 from . import __version__
 from .core.pipeline import GoldPanPipeline
+from .core.schemas import FirewallReport
 from .extractors.liteparse_wrapper import LiteParseExtractor
 from .extractors.markitdown_wrapper import MarkItDownExtractor
 from .extractors.web_extractor import HybridWebExtractor
 from .filters.heuristic_filter import HeuristicFilter
 from .filters.semantic_router import SemanticRouterFilter
+from .firewall.context_firewall import build_provenance_meta, spotlight_untrusted_content
 from .formatters.markdown_formatter import AIFriendlyMarkdownFormatter
 from .kb.chroma_manager import ChromaManager, compute_document_id
+from .kb.onnx_embedder import collect_doctor_diagnostics
 
 PROTOCOL_VERSION = "2024-11-05"
 
@@ -28,30 +30,35 @@ def _build_pipeline(
     source: str,
     api_key: Optional[str] = None,
     use_playwright_fallback: bool = True,
+    firewall_mode: str = "sanitize",
 ) -> GoldPanPipeline:
     if _is_url(source):
-        extractor = HybridWebExtractor(use_playwright_fallback=use_playwright_fallback)
+        extractor = HybridWebExtractor(
+            use_playwright_fallback=use_playwright_fallback,
+            firewall_mode=firewall_mode,
+        )
     else:
         ext = os.path.splitext(source)[1].lower()
         if ext in [".txt", ".csv", ".json", ".md", ".xml"]:
             extractor = LiteParseExtractor()
         else:
-            extractor = MarkItDownExtractor(api_key=api_key)
+            extractor = MarkItDownExtractor(api_key=api_key, firewall_mode=firewall_mode)
 
     pipeline = GoldPanPipeline(extractor=extractor)
     pipeline.add_filter(HeuristicFilter())
     pipeline.add_filter(SemanticRouterFilter(api_key=api_key))
-    pipeline.set_formatter(AIFriendlyMarkdownFormatter())
+    pipeline.set_formatter(AIFriendlyMarkdownFormatter(firewall_mode=firewall_mode))
     return pipeline
 
 
 class GoldPanMCPServer:
     """
-    Model Context Protocol (MCP) server for GoldPan AI.
-    Enforces rea-tool-design principles:
+    Model Context Protocol (MCP) server for GoldPan AI v3.0.
+    Enforces rea-tool-design principles + Agent Context Firewall:
     1. Explicit `coverage` & `residual_unknowns`
-    2. Untrusted content provenance (`_meta.provenance.untrusted_content = true`)
+    2. Untrusted content provenance (`_meta.provenance.untrusted_content = true` + `_meta.provenance.firewall`)
     3. Response budget & progressive detail (`detail: "summary" | "complete"`)
+    4. Optional XML Data Spotlighting (`<untrusted_document_content>`)
     """
 
     def __init__(
@@ -59,7 +66,7 @@ class GoldPanMCPServer:
         persist_directory: Optional[str] = None,
         kb_dir: Optional[str] = None,
         api_key: Optional[str] = None,
-    ):
+    ) -> None:
         repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.kb_dir = kb_dir or os.path.join(repo_root, "KB")
         os.makedirs(self.kb_dir, exist_ok=True)
@@ -74,8 +81,8 @@ class GoldPanMCPServer:
                 "name": "goldpan_extract",
                 "description": (
                     "Extract clean, AI-ready Markdown from any URL (Web, GitHub blob, YouTube) or local file "
-                    "(PDF, DOCX, CSV, JSON, XML, Image, Audio). Defaults to detail='summary' with a bounded "
-                    "character budget to protect context windows; pass detail='complete' for full output."
+                    "(PDF, DOCX, CSV, JSON, XML, Image, Audio) protected by the Agent Context Firewall. "
+                    "Defaults to detail='summary' with a bounded character budget; pass detail='complete' for full output."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -107,6 +114,17 @@ class GoldPanMCPServer:
                             "default": True,
                             "description": "Allow headless Playwright fallback for JS-heavy web pages.",
                         },
+                        "firewall_mode": {
+                            "type": "string",
+                            "enum": ["sanitize", "audit", "strict"],
+                            "default": "sanitize",
+                            "description": "Agent Context Firewall mode: 'sanitize' (default), 'audit', or 'strict'.",
+                        },
+                        "spotlight": {
+                            "type": "boolean",
+                            "default": False,
+                            "description": "If true, wraps returned markdown in <untrusted_document_content> XML spotlight tags.",
+                        },
                     },
                     "required": ["source"],
                 },
@@ -114,8 +132,8 @@ class GoldPanMCPServer:
             {
                 "name": "goldpan_kb_ingest",
                 "description": (
-                    "Ingest Markdown content into the local GoldPan Knowledge Base (ChromaDB Dual-Mode ONNX/Gemini "
-                    "+ physical KB/*.md mirror)."
+                    "Ingest Markdown content into the local GoldPan v3 Knowledge Base (Multilingual E5 ONNX + "
+                    "SQLite FTS5 + Hierarchical Breadcrumb Chunker + physical KB/*.md mirror)."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -135,7 +153,7 @@ class GoldPanMCPServer:
                         "prefer_local": {
                             "type": "boolean",
                             "default": True,
-                            "description": "Use 100% offline Local ONNX embeddings (all-MiniLM-L6-v2, 384d).",
+                            "description": "Use 100% offline Local ONNX embeddings (intfloat/multilingual-e5-small, 384d).",
                         },
                     },
                     "required": ["markdown", "title"],
@@ -144,15 +162,15 @@ class GoldPanMCPServer:
             {
                 "name": "goldpan_kb_search",
                 "description": (
-                    "Run semantic vector search across the GoldPan Knowledge Base and return ranked passages "
-                    "with source citations, distance scores, coverage, and untrusted-content provenance."
+                    "Run Hybrid RRF search (Multilingual E5 384d + SQLite FTS5 BM25 + Gemini 768d) across the "
+                    "GoldPan Knowledge Base and return ranked passages with citations, coverage, and firewall provenance."
                 ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
                         "query": {
                             "type": "string",
-                            "description": "Natural language search query.",
+                            "description": "Natural language search query (supports accented/unaccented Vietnamese & English).",
                         },
                         "n_results": {
                             "type": "integer",
@@ -166,6 +184,11 @@ class GoldPanMCPServer:
                             "enum": ["summary", "complete"],
                             "default": "summary",
                             "description": "In 'summary' mode each chunk preview is capped at 800 chars; 'complete' returns full chunks.",
+                        },
+                        "spotlight": {
+                            "type": "boolean",
+                            "default": False,
+                            "description": "If true, wraps each retrieved passage in <untrusted_document_content> tags.",
                         },
                     },
                     "required": ["query"],
@@ -191,6 +214,22 @@ class GoldPanMCPServer:
                         },
                     },
                     "required": ["document_id"],
+                },
+            },
+            {
+                "name": "goldpan_kb_audit",
+                "description": "Scan all chunks currently in the Knowledge Base for prompt injection signatures using AgentContextFirewall(mode='audit').",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+            {
+                "name": "goldpan_doctor",
+                "description": "Inspect hardware execution providers (Tier 1 CPU INT8, Tier 2 DirectML FP32, Tier 3 CUDA/OpenVINO/CoreML), warmup latency, SQLite FTS5 status, and v2->v3 migration health.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
                 },
             },
         ]
@@ -230,12 +269,7 @@ class GoldPanMCPServer:
                                 "text": text,
                             }
                         ],
-                        "_meta": {
-                            "provenance": {
-                                "untrusted_content": True,
-                                "source": doc.get("source", p),
-                            }
-                        },
+                        "_meta": build_provenance_meta(FirewallReport(mode="sanitize"), source=str(doc.get("source", p))),
                     }
         raise ValueError(f"Knowledge Base document not found for URI: {uri}")
 
@@ -261,11 +295,19 @@ class GoldPanMCPServer:
             max_chars = int(arguments.get("max_chars", 4000))
             ingest_to_kb = bool(arguments.get("ingest_to_kb", False))
             use_pw = bool(arguments.get("use_playwright_fallback", True))
+            firewall_mode = str(arguments.get("firewall_mode", "sanitize"))
+            spotlight = bool(arguments.get("spotlight", False))
 
-            pipeline = _build_pipeline(source, api_key=self.api_key, use_playwright_fallback=use_pw)
+            pipeline = _build_pipeline(
+                source,
+                api_key=self.api_key,
+                use_playwright_fallback=use_pw,
+                firewall_mode=firewall_mode,
+            )
             result = pipeline.process(source)
             full_text = result.text
             total_chars = len(full_text)
+            fw_report = result.firewall or FirewallReport(mode=firewall_mode)
 
             residual_unknowns: List[str] = []
             router_mode = result.stats.get("router_mode", "local_heuristic")
@@ -287,6 +329,9 @@ class GoldPanMCPServer:
                     f"Output truncated at {max_chars}/{total_chars} characters under detail='summary'. Pass detail='complete' or increase max_chars for full text."
                 )
 
+            if spotlight:
+                output_text = spotlight_untrusted_content(output_text, source=source, report=fw_report)
+
             ingested_info = None
             if ingest_to_kb:
                 title = result.doc_info.title or os.path.basename(source)
@@ -306,6 +351,7 @@ class GoldPanMCPServer:
                     "physical_file": physical_path,
                 }
 
+            meta_obj = build_provenance_meta(fw_report, source=source)
             payload = {
                 "title": result.doc_info.title,
                 "source": source,
@@ -317,6 +363,7 @@ class GoldPanMCPServer:
                     "total_chars": total_chars,
                     "returned_chars": len(output_text),
                 },
+                "firewall": fw_report.model_dump(),
                 "ingested": ingested_info,
                 "coverage": {
                     "completeness": "partial" if (truncated or router_mode == "local_heuristic") else "complete",
@@ -325,12 +372,7 @@ class GoldPanMCPServer:
                     "returned_chars": len(output_text),
                 },
                 "residual_unknowns": residual_unknowns,
-                "_meta": {
-                    "provenance": {
-                        "untrusted_content": True,
-                        "source": source,
-                    }
-                },
+                "_meta": meta_obj,
             }
             return {
                 "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, indent=2)}],
@@ -380,13 +422,17 @@ class GoldPanMCPServer:
                 raise ValueError("'query' is required.")
             n_results = int(arguments.get("n_results", 4))
             detail = arguments.get("detail", "summary")
+            spotlight = bool(arguments.get("spotlight", False))
 
             hits = self.chroma.search_with_citations(query, n_results=n_results)
             residual_unknowns: List[str] = []
             if not self.api_key and self.chroma.gemini_collection.count() > 0:
                 residual_unknowns.append(
-                    "Cloud collection 'goldpan_kb_gemini' contains vectors but was skipped because GEMINI_API_KEY is not set; searched 'goldpan_kb_local' (ONNX 384d) only."
+                    "Cloud collection 'goldpan_kb_gemini' contains vectors but was skipped because GEMINI_API_KEY is not set; searched local E5 ONNX + SQLite FTS5 only."
                 )
+            mig = self.chroma.check_migration_status()
+            if mig.get("needs_migration"):
+                residual_unknowns.append(mig["warning"])
 
             formatted_hits = []
             for h in hits:
@@ -395,6 +441,8 @@ class GoldPanMCPServer:
                 if detail == "summary" and len(text) > 800:
                     text = text[:800] + "..."
                     truncated = True
+                if spotlight:
+                    text = spotlight_untrusted_content(text, source=str(h["source"]))
                 formatted_hits.append(
                     {
                         "title": h["title"],
@@ -407,6 +455,7 @@ class GoldPanMCPServer:
                     }
                 )
 
+            meta_obj = build_provenance_meta(FirewallReport(mode="sanitize"), source="goldpan_kb")
             payload = {
                 "query": query,
                 "detail": detail,
@@ -416,14 +465,10 @@ class GoldPanMCPServer:
                     "completeness": "partial" if residual_unknowns else "complete",
                     "local_collection_chunks": self.chroma.local_collection.count(),
                     "gemini_collection_chunks": self.chroma.gemini_collection.count(),
+                    "sqlite_fts5_chunks": self.chroma.fts_index.count() if self.chroma.fts_index else 0,
                 },
                 "residual_unknowns": residual_unknowns,
-                "_meta": {
-                    "provenance": {
-                        "untrusted_content": True,
-                        "source": "goldpan_kb",
-                    }
-                },
+                "_meta": meta_obj,
             }
             return {
                 "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, indent=2)}],
@@ -464,6 +509,14 @@ class GoldPanMCPServer:
                 ]
             }
 
+        elif name == "goldpan_kb_audit":
+            audit_res = self.chroma.audit_kb()
+            return {"content": [{"type": "text", "text": json.dumps(audit_res, ensure_ascii=False, indent=2)}]}
+
+        elif name == "goldpan_doctor":
+            diag = collect_doctor_diagnostics(persist_dir=self.chroma.persist_directory)
+            return {"content": [{"type": "text", "text": json.dumps(diag, ensure_ascii=False, indent=2)}]}
+
         else:
             raise ValueError(f"Unknown tool: {name}")
 
@@ -472,7 +525,6 @@ class GoldPanMCPServer:
         req_id = req.get("id")
         params = req.get("params") or {}
 
-        # Notifications have no id and expect no response
         if req_id is None:
             return None
 
@@ -526,7 +578,7 @@ class GoldPanMCPServer:
             }
 
 
-def main():
+def main() -> None:
     """Run GoldPan MCP Server over stdio (supports both newline-delimited and Content-Length JSON-RPC)."""
     server = GoldPanMCPServer()
     stdin = sys.stdin.buffer
@@ -545,7 +597,6 @@ def main():
         if stripped.lower().startswith(b"content-length:"):
             use_content_length = True
             length = int(stripped.split(b":", 1)[1].strip())
-            # Consume remaining headers until blank line
             while True:
                 hdr = stdin.readline()
                 if not hdr or hdr.strip() == b"":

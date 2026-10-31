@@ -1,3 +1,3 @@
-"""GoldPan AI v2.1 — Privacy-First Multimodal Data Refinery, Hybrid Local ONNX RAG & MCP Engine."""
+"""GoldPan AI v3.0 — Privacy-First Multimodal Data Refinery, Multilingual E5 ONNX RAG, Context Firewall & MCP Engine."""
 
-__version__ = "2.1.0"
+__version__ = "3.0.0"
