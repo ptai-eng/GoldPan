@@ -57,6 +57,10 @@ class AIFriendlyMarkdownFormatter:
         stats = dict(content.stats)
         stats["detected_encoding"] = detected_encoding
         stats["firewall"] = fw_report.model_dump()
+        if "ocr" in (content.doc_info.metadata or {}):
+            stats["ocr"] = content.doc_info.metadata["ocr"]
+        if "is_scanned" in (content.doc_info.metadata or {}):
+            stats["is_scanned"] = content.doc_info.metadata["is_scanned"]
         content.doc_info.metadata["firewall"] = fw_report.model_dump()
         content.doc_info.metadata["detected_encoding"] = detected_encoding
 

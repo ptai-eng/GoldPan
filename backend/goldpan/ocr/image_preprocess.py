@@ -8,9 +8,15 @@ from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 
 def load_image(image_input: Union[str, Path, Image.Image]) -> Image.Image:
-    """Load image from file path or return existing PIL Image instance in RGB."""
+    """Load image from file path or return existing PIL Image instance in RGB (closing file handles immediately)."""
     if isinstance(image_input, (str, Path)):
-        img = Image.open(str(image_input))
+        with Image.open(str(image_input)) as raw_img:
+            try:
+                transposed = ImageOps.exif_transpose(raw_img)
+            except Exception:
+                transposed = raw_img
+            img = transposed.convert("RGB") if transposed.mode not in ("RGB", "L") else transposed.copy()
+        return img
     elif isinstance(image_input, Image.Image):
         img = image_input
     else:
@@ -40,15 +46,38 @@ def sharpen_text(img: Image.Image) -> Image.Image:
 
 def binarize_adaptive(gray_img: Image.Image, window_size: int = 25, k: float = 0.2) -> Image.Image:
     """
-    Sauvola/Otsu-style adaptive threshold binarization for non-uniform lighting/shadows in scanned documents.
+    Vectorized 2D Integral-Image Sauvola adaptive threshold binarization:
+        T(x, y) = mean(x, y) * [1 + k * ((std(x, y) / R) - 1)], R = 128.0
+    Handles uneven illumination, page curvature shadows, and low-contrast scans in O(1) per pixel.
     """
     if gray_img.mode != "L":
         gray_img = gray_img.convert("L")
 
-    arr = np.array(gray_img, dtype=np.float32)
-    # Fast thresholding using mean luminance cutoff
-    mean_val = float(np.mean(arr))
-    thresh = max(60.0, min(210.0, mean_val * 0.92))
+    arr = np.array(gray_img, dtype=np.float64)
+    h, w = arr.shape
+    win = max(3, int(window_size) | 1)  # Ensure odd window size >= 3
+    pad = win // 2
+
+    padded = np.pad(arr, pad_width=pad, mode="reflect")
+    # 2D integral images (padded with a leading 0 row/col for 4-corner box lookups)
+    ii = np.pad(np.cumsum(np.cumsum(padded, axis=0), axis=1), ((1, 0), (1, 0)), mode="constant")
+    ii_sq = np.pad(np.cumsum(np.cumsum(padded * padded, axis=0), axis=1), ((1, 0), (1, 0)), mode="constant")
+
+    area = float(win * win)
+    local_sum = ii[win : win + h, win : win + w] - ii[0:h, win : win + w] - ii[win : win + h, 0:w] + ii[0:h, 0:w]
+    local_sq_sum = (
+        ii_sq[win : win + h, win : win + w]
+        - ii_sq[0:h, win : win + w]
+        - ii_sq[win : win + h, 0:w]
+        + ii_sq[0:h, 0:w]
+    )
+
+    mean = local_sum / area
+    variance = np.maximum(0.0, (local_sq_sum / area) - (mean * mean))
+    std = np.sqrt(variance)
+
+    R = 128.0
+    thresh = mean * (1.0 + float(k) * ((std / R) - 1.0))
     binary = np.where(arr > thresh, 255, 0).astype(np.uint8)
     return Image.fromarray(binary, mode="L")
 

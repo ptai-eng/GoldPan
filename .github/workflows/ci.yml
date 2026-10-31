@@ -1,4 +1,4 @@
-name: GoldPan AI v3.1 CI & Benchmark Gate
+name: GoldPan AI v3.2 CI & Benchmark Gate
 
 on:
   push:

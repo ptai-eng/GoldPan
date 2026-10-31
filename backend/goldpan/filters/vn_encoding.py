@@ -7,7 +7,7 @@ import unicodedata
 # Strictly ordered longest-first (3-char -> 2-char -> 1-char) so single-byte tone markers
 # (like ï, ø, ù, û, õ, â, ê, ô, ö) never clobber multi-char sequences (like hôïp -> hợp).
 _VNI_SEQUENCES: list[tuple[str, str]] = [
-    # 3-character sequences (ư + ơ compound öô / ÖÔ with tones)
+    # 3-character sequences (ư + ơ compound öô / ÖÔ with tones, and 3-char aê/eâ/oâ fallbacks)
     ("öôø", "ườ"),
     ("öôù", "ướ"),
     ("öôû", "ưở"),
@@ -18,6 +18,16 @@ _VNI_SEQUENCES: list[tuple[str, str]] = [
     ("ÖÔÛ", "ƯỞ"),
     ("ÖÔÕ", "ƯỠ"),
     ("ÖÔÏ", "ƯỢ"),
+    ("aêø", "ằ"),
+    ("aêù", "ắ"),
+    ("aêû", "ẳ"),
+    ("aêõ", "ẵ"),
+    ("aêï", "ặ"),
+    ("AÊØ", "Ằ"),
+    ("AÊÙ", "Ắ"),
+    ("AÊÛ", "Ẳ"),
+    ("AÊÕ", "Ẵ"),
+    ("AÊÏ", "Ặ"),
     # 2-character sequences: a / â / ă
     ("aø", "à"),
     ("aù", "á"),
@@ -130,15 +140,27 @@ _VNI_SEQUENCES: list[tuple[str, str]] = [
     ("ÖÛ", "Ử"),
     ("ÖÕ", "Ữ"),
     ("ÖÏ", "Ự"),
-    # 2-character sequences: y
+    # 2-character sequences: i & y
+    ("iø", "ì"),
+    ("iù", "í"),
+    ("iû", "ỉ"),
+    ("iõ", "ĩ"),
+    ("iï", "ị"),
+    ("IØ", "Ì"),
+    ("IÙ", "Í"),
+    ("IÛ", "Ỉ"),
+    ("IÕ", "Ĩ"),
+    ("IÏ", "Ị"),
     ("yø", "ỳ"),
     ("yù", "ý"),
     ("yû", "ỷ"),
     ("yõ", "ỹ"),
+    ("yï", "ỵ"),
     ("YØ", "Ỳ"),
     ("YÙ", "Ý"),
     ("YÛ", "Ỷ"),
     ("YÕ", "Ỹ"),
+    ("YÏ", "Ỵ"),
     # 1-character VNI vowel/consonant mappings (applied only after all 2/3-char sequences)
     ("ñ", "đ"),
     ("Ñ", "Đ"),
@@ -148,6 +170,8 @@ _VNI_SEQUENCES: list[tuple[str, str]] = [
     ("Ö", "Ư"),
     ("ò", "ị"),
     ("Ò", "Ị"),
+    ("î", "ỉ"),
+    ("Î", "Ỉ"),
 ]
 
 # TCVN3 (ABC) multi-char sequences and single-char table (longest-first)

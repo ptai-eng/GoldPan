@@ -371,6 +371,7 @@ def extract_file(
             clean_title = safe_basename
             result.text = result.text.replace(os.path.basename(file_path), safe_basename)
 
+        doc_meta = result.doc_info.metadata or {}
         return {
             "markdown": result.text,
             "metadata": {
@@ -379,6 +380,8 @@ def extract_file(
                 "title": clean_title,
                 "stats": result.stats,
                 "firewall": result.firewall.model_dump() if result.firewall else None,
+                "ocr": doc_meta.get("ocr"),
+                "is_scanned": doc_meta.get("is_scanned"),
             },
             "_meta": build_provenance_meta(result.firewall, source=safe_basename),
         }

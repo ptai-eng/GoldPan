@@ -667,13 +667,13 @@ def test_pillar_c_goldpan_bench_and_ci_gate():
 
 
 def test_v3_1_offline_ocr_and_tier2_hardware():
-    print("=== [15/15] Testing GoldPan v3.1: Offline Vietnamese OCR & Tier 2 Apple Silicon / OpenVINO ===")
+    print("=== [15/16] Testing GoldPan v3.1: Offline Vietnamese OCR & Tier 2 Apple Silicon / OpenVINO ===")
     from PIL import Image, ImageDraw
     from goldpan.ocr.engine import VietnameseOfflineOCR
     from goldpan.ocr.pdf_scanner import is_scanned_pdf, render_pdf_page_to_image
     from goldpan.kb.onnx_embedder import select_onnx_providers
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         img_path = os.path.join(tmpdir, "test_scan.png")
         img = Image.new("RGB", (400, 150), color=(255, 255, 255))
         draw = ImageDraw.Draw(img)
@@ -725,7 +725,7 @@ def test_v3_2_playwright_tier2_firewall_and_templates():
     print("=== [16/16] Testing GoldPan v3.2: Playwright Tier-2 Computed-Style DOM Firewall & Contributor CI ===")
     from goldpan.extractors.web_extractor import HybridWebExtractor
 
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         html_file = os.path.join(tmpdir, "stealth_attack.html")
         with open(html_file, "w", encoding="utf-8") as f:
             f.write(
@@ -758,6 +758,44 @@ def test_v3_2_playwright_tier2_firewall_and_templates():
         assert "STEALTH SYSTEM PROMPT INJECTION" not in pw_html
         assert "OFFSCREEN PROMPT HIJACKING" not in pw_html
         assert "clean visible content that must be preserved" in pw_html
+
+        # Verify pure <style> block parsing in AgentContextFirewall.process_html (offline / no browser)
+        with open(html_file, "r", encoding="utf-8") as f:
+            raw_html_str = f.read()
+        clean_static, rep_static = AgentContextFirewall(mode="sanitize").process_html(raw_html_str)
+        assert rep_static.is_suspicious is True
+        assert rep_static.sanitized_count >= 3
+        assert "IGNORE ALL PREVIOUS INSTRUCTIONS" not in clean_static
+        assert "STEALTH SYSTEM PROMPT INJECTION" not in clean_static
+        assert "OFFSCREEN PROMPT HIJACKING" not in clean_static
+        assert "clean visible content that must be preserved" in clean_static
+
+        # Verify Sauvola 2D Integral-Image Adaptive Binarization on uneven lighting with text strokes
+        import numpy as np
+        from PIL import Image
+        from goldpan.ocr.image_preprocess import binarize_adaptive
+
+        gradient = np.tile(np.linspace(90, 240, 120, dtype=np.uint8), (60, 1))
+        # Draw thin dark text strokes (3px thick) across both shadowed left side and bright right side
+        gradient[28:31, 15:105] = 20
+        bin_img = binarize_adaptive(Image.fromarray(gradient, mode="L"), window_size=15, k=0.2)
+        bin_arr = np.asarray(bin_img)
+        assert set(np.unique(bin_arr)).issubset({0, 255})
+        assert np.mean(bin_arr[28:31, 20:100]) == 0  # Stroke is cleanly binarized to black (0) across shadow & bright zones
+        assert np.mean(bin_arr[5:15, 10:110]) == 255  # Background is cleanly binarized to white (255) across gradient
+
+        # Verify FTS5 chunk cleanup on document deletion (zero ghost BM25 hits)
+        kb_del_dir = os.path.join(tmpdir, "kb_fts_del")
+        kb_del = ChromaManager(persist_directory=kb_del_dir, prefer_local=True)
+        kb_del.ingest_document(
+            document_id="doc-ephemeral",
+            text="# Ephemeral Secret\n\nProject Chimera launch code is 99887766.",
+            metadata={"title": "Chimera Doc", "file_path": "chimera.md"},
+        )
+        assert len(kb_del.fts_index.search_bm25("Chimera 99887766", limit=5)) >= 1
+        kb_del.delete_document("doc-ephemeral")
+        assert len(kb_del.fts_index.search_bm25("Chimera 99887766", limit=5)) == 0
+        assert len(kb_del.search_with_citations("Chimera 99887766", n_results=5)) == 0
 
     github_dir = Path(ROOT_DIR) / ".github"
     issue_dir = github_dir / "ISSUE_TEMPLATE"

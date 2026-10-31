@@ -1,3 +1,4 @@
+import os
 import re
 from urllib.parse import urlparse
 
@@ -168,35 +169,74 @@ class HybridWebExtractor:
                 page = browser.new_page(user_agent=DEFAULT_HEADERS["User-Agent"])
                 page.goto(url, wait_until="domcontentloaded", timeout=15000)
 
-                stripped_count = page.evaluate("""
-                    () => {
+                should_remove = self.firewall_mode != "audit"
+                stripped_count = page.evaluate(
+                    """
+                    (shouldRemove) => {
                         let count = 0;
                         const elements = Array.from(document.querySelectorAll('*'));
                         for (const el of elements) {
                             try {
                                 if (['HTML', 'HEAD', 'BODY', 'META', 'TITLE', 'SCRIPT', 'STYLE', 'LINK'].includes(el.tagName)) continue;
                                 const style = window.getComputedStyle(el);
+                                const bg = style.backgroundColor || '';
+                                const fg = style.color || '';
+                                const sameColorStealth = (
+                                    bg && bg !== 'rgba(0, 0, 0, 0)' && bg !== 'transparent' && fg === bg
+                                );
+                                const rect = el.getBoundingClientRect();
+                                const offscreenRect = (
+                                    rect.width > 0 && (rect.right < -500 || rect.bottom < -500 || rect.left < -2000 || rect.top < -2000)
+                                );
                                 const isHidden = 
+                                    el.hasAttribute('hidden') ||
                                     style.display === 'none' ||
                                     style.visibility === 'hidden' ||
                                     parseFloat(style.opacity) === 0 ||
                                     parseFloat(style.fontSize) <= 1 ||
                                     style.clip === 'rect(0px, 0px, 0px, 0px)' ||
                                     style.clipPath === 'inset(50%)' ||
-                                    (style.transform && style.transform.includes('-9999'));
+                                    (style.transform && style.transform.includes('-9999')) ||
+                                    sameColorStealth ||
+                                    offscreenRect;
 
                                 if (isHidden) {
-                                    el.remove();
+                                    if (shouldRemove) {
+                                        el.remove();
+                                    }
                                     count++;
                                 }
                             } catch (e) {}
                         }
                         return count;
                     }
-                """)
+                    """,
+                    should_remove,
+                )
                 html = page.content()
                 browser.close()
                 return html, int(stripped_count or 0)
         except Exception as e:
             print(f"[Playwright Fallback] Warning: {e}")
+            # Graceful deterministic fallback when Chromium binary is not installed
+            try:
+                raw_html = ""
+                if url.startswith("file:///"):
+                    from urllib.request import url2pathname
+
+                    file_part = url[len("file://") :]
+                    local_path = url2pathname(file_part)
+                    if not os.path.exists(local_path) and file_part.startswith("/"):
+                        local_path = file_part.lstrip("/")
+                    with open(local_path, "r", encoding="utf-8", errors="ignore") as f:
+                        raw_html = f.read()
+                elif url.startswith(("http://", "https://")):
+                    resp = requests.get(url, headers=DEFAULT_HEADERS, timeout=12)
+                    if resp.ok:
+                        raw_html = resp.text
+                if raw_html:
+                    cleaned_html, rep = self.firewall.process_html(raw_html)
+                    return cleaned_html, int(rep.sanitized_count or 0)
+            except Exception:
+                pass
             return None, 0

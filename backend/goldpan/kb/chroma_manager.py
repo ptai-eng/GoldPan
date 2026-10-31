@@ -782,7 +782,8 @@ class ChromaManager:
         return list(docs.values())
 
     def delete_document(self, document_id: str) -> None:
-        """Deletes a document by ID across all collections."""
+        """Deletes a document by ID across all Chroma collections and persistent SQLite FTS5."""
+        collected_chunk_ids: list[str] = []
         for col in (self.local_collection, self.gemini_collection, self.legacy_collection):
             if col is None:
                 continue
@@ -790,9 +791,15 @@ class ChromaManager:
                 existing = col.get(where={"document_id": document_id})
                 target_ids = existing.get("ids") if existing else None
                 if target_ids:
+                    collected_chunk_ids.extend(target_ids)
                     col.delete(ids=target_ids)
             except Exception:
                 continue
+        if self.fts_index is not None:
+            try:
+                self.fts_index.delete_chunks(chunk_ids=collected_chunk_ids, document_id=document_id)
+            except Exception:
+                pass
 
     def reindex_from_kb_dir(self, kb_dir: str | Path | None = None) -> dict[str, Any]:
         """Re-index all `.md` files in `KB/` or `kb_data/` into v3 E5 + SQLite FTS5."""

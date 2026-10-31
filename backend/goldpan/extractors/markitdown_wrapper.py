@@ -15,8 +15,10 @@ class GeminiMultimodalConverter(DocumentConverter):
         self,
         api_key: str | None = None,
         firewall_mode: str = "sanitize",
+        enable_ocr: bool = True,
     ) -> None:
         self.api_key = api_key
+        self.enable_ocr = enable_ocr
         if self.api_key:
             from google import genai
 
@@ -25,6 +27,7 @@ class GeminiMultimodalConverter(DocumentConverter):
             self.client = None
         self.local_captioner = HybridVisionCaptioner(api_key=self.api_key)
         self.ocr_engine = VietnameseOfflineOCR(firewall_mode=firewall_mode)
+        self.last_ocr_meta: dict | None = None
 
     def accepts(self, file_stream, stream_info, **kwargs) -> bool:
         if stream_info and stream_info.extension:
@@ -35,6 +38,7 @@ class GeminiMultimodalConverter(DocumentConverter):
         return False
 
     def convert(self, file_stream, stream_info, **kwargs) -> DocumentConverterResult:
+        self.last_ocr_meta = None
         local_path = getattr(file_stream, "name", None)
         if not local_path or not isinstance(local_path, str) or not os.path.exists(local_path):
             raise ValueError("Multimodal converter requires a valid local file path.")
@@ -43,16 +47,23 @@ class GeminiMultimodalConverter(DocumentConverter):
 
         if not self.client:
             if ext in [".jpg", ".jpeg", ".png", ".webp"]:
-                # Offline OCR text recognition
-                ocr_page = self.ocr_engine.extract_from_image(source_str)
                 exif_summary = self.local_captioner.process_image(source_str)
-
-                if ocr_page.text and not ocr_page.text.startswith("[Trang scan không chứa"):
-                    content = (
-                        f"# {os.path.basename(source_str)}\n\n"
-                        f"{ocr_page.text}\n\n"
-                        f"---\n*{exif_summary} | OCR: {ocr_page.backend} (conf={ocr_page.confidence:.2f})*\n"
-                    )
+                if self.enable_ocr:
+                    ocr_page = self.ocr_engine.extract_from_image(source_str)
+                    self.last_ocr_meta = {
+                        "backend": ocr_page.backend,
+                        "confidence": ocr_page.confidence,
+                        "lines_count": ocr_page.lines_count,
+                        "is_scanned": True,
+                    }
+                    if ocr_page.text and not ocr_page.text.startswith("[Trang scan không chứa"):
+                        content = (
+                            f"# {os.path.basename(source_str)}\n\n"
+                            f"{ocr_page.text}\n\n"
+                            f"---\n*{exif_summary} | OCR: {ocr_page.backend} (conf={ocr_page.confidence:.2f})*\n"
+                        )
+                    else:
+                        content = f"# {os.path.basename(source_str)}\n\n{exif_summary}\n"
                 else:
                     content = f"# {os.path.basename(source_str)}\n\n{exif_summary}\n"
 
@@ -81,9 +92,18 @@ class GeminiMultimodalConverter(DocumentConverter):
             )
         except Exception as e:
             if ext in [".jpg", ".jpeg", ".png", ".webp"]:
-                ocr_page = self.ocr_engine.extract_from_image(source_str)
                 exif_summary = self.local_captioner.process_image(source_str)
-                content = f"# {os.path.basename(source_str)}\n\n{ocr_page.text or exif_summary}\n"
+                if self.enable_ocr:
+                    ocr_page = self.ocr_engine.extract_from_image(source_str)
+                    self.last_ocr_meta = {
+                        "backend": ocr_page.backend,
+                        "confidence": ocr_page.confidence,
+                        "lines_count": ocr_page.lines_count,
+                        "is_scanned": True,
+                    }
+                    content = f"# {os.path.basename(source_str)}\n\n{ocr_page.text or exif_summary}\n"
+                else:
+                    content = f"# {os.path.basename(source_str)}\n\n{exif_summary}\n"
                 return DocumentConverterResult(
                     title=os.path.basename(source_str),
                     text_content=content,
@@ -104,8 +124,13 @@ class MarkItDownExtractor:
         self.enable_ocr = enable_ocr
         self.firewall = AgentContextFirewall(mode=firewall_mode)
         self.ocr_engine = VietnameseOfflineOCR(firewall_mode=firewall_mode)
+        self.multimodal_converter = GeminiMultimodalConverter(
+            self.api_key,
+            firewall_mode=firewall_mode,
+            enable_ocr=enable_ocr,
+        )
         self.md_client.register_converter(
-            GeminiMultimodalConverter(self.api_key, firewall_mode=firewall_mode),
+            self.multimodal_converter,
             priority=-1.0,
         )
 
@@ -185,7 +210,20 @@ class MarkItDownExtractor:
                 original_format="html",
             )
 
-        result = self.md_client.convert(source)
+        try:
+            result = self.md_client.convert(source)
+            extracted_text = result.text_content
+        except Exception as conv_err:
+            if ext == ".docx":
+                # Pure-Python OOXML fallback if markitdown[docx]/mammoth is not installed
+                extracted_text = self._extract_docx_xml_fallback(source)
+            else:
+                raise conv_err
+
+        if self.multimodal_converter.last_ocr_meta is not None:
+            fw_meta["ocr"] = self.multimodal_converter.last_ocr_meta
+            if "is_scanned" in self.multimodal_converter.last_ocr_meta:
+                fw_meta["is_scanned"] = self.multimodal_converter.last_ocr_meta["is_scanned"]
 
         doc_info = DocumentInfo(
             file_path=source,
@@ -194,7 +232,32 @@ class MarkItDownExtractor:
         )
 
         return RawContent(
-            text=result.text_content,
+            text=extracted_text,
             doc_info=doc_info,
             original_format="markitdown",
         )
+
+    @staticmethod
+    def _extract_docx_xml_fallback(source: str) -> str:
+        """Pure-Python OOXML paragraph & table extractor for .docx files."""
+        import zipfile
+        import xml.etree.ElementTree as ET
+
+        paragraphs: list[str] = []
+        with zipfile.ZipFile(source, "r") as zf:
+            if "word/document.xml" not in zf.namelist():
+                return ""
+            xml_bytes = zf.read("word/document.xml")
+        root = ET.fromstring(xml_bytes)
+        for elem in root.iter():
+            tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
+            if tag == "p":
+                runs: list[str] = []
+                for child in elem.iter():
+                    ctag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                    if ctag == "t" and child.text:
+                        runs.append(child.text)
+                line = "".join(runs).strip()
+                if line:
+                    paragraphs.append(line)
+        return "\n\n".join(paragraphs)

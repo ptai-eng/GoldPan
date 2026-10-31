@@ -45,12 +45,16 @@ _RE_CSS_ZERO_FONT = re.compile(
     re.IGNORECASE,
 )
 _RE_CSS_WHITE_ON_WHITE = re.compile(
-    r"color\s*:\s*(?:#fff(?:fff)?|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)).*?"
-    r"background(?:-color)?\s*:\s*(?:#fff(?:fff)?|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\))",
+    r"(?:color\s*:\s*(?:#fff(?:fff)?|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)).*?"
+    r"background(?:-color)?\s*:\s*(?:#fff(?:fff)?|white|rgb\(\s*255\s*,\s*255\s*,\s*255\s*\)))|"
+    r"(?:color\s*:\s*(var\(--[a-zA-Z0-9_-]+\)).*?background(?:-color)?\s*:\s*\1)",
     re.IGNORECASE | re.DOTALL,
 )
 _RE_CSS_OFFSCREEN = re.compile(
-    r"(?:left|top|right|text-indent)\s*:\s*-\d{3,}(?:px|em|rem|vw|vh)",
+    r"(?:(?:left|top|right|text-indent)\s*:\s*-\d{3,}(?:px|em|rem|vw|vh))|"
+    r"(?:transform\s*:\s*translate[XY3d]*\(\s*-\d{3,})|"
+    r"(?:clip-path\s*:\s*inset\(\s*50%\s*\))|"
+    r"(?:clip\s*:\s*rect\(\s*0(?:px)?\s*,\s*0(?:px)?\s*,\s*0(?:px)?\s*,\s*0(?:px)?\s*\))",
     re.IGNORECASE,
 )
 
@@ -132,10 +136,45 @@ class AgentContextFirewall:
                 if self.mode == "sanitize":
                     tmpl.decompose()
 
-        # 3. Inspect inline CSS styles for hidden/offscreen/zero-font/white-on-white payloads
+        # 2.5. Inspect <style> blocks for stylesheet-level stealth selectors (.class, #id, [attr])
+        for style_tag in soup.find_all("style"):
+            css_text = style_tag.get_text() or ""
+            for rule_match in re.finditer(r"([^{}]+)\{([^{}]+)\}", css_text):
+                raw_selectors, decls = rule_match.group(1).strip(), rule_match.group(2).strip()
+                if (
+                    _RE_CSS_DISPLAY_NONE.search(decls)
+                    or _RE_CSS_VISIBILITY_OPACITY.search(decls)
+                    or _RE_CSS_ZERO_FONT.search(decls)
+                    or _RE_CSS_WHITE_ON_WHITE.search(decls)
+                    or _RE_CSS_OFFSCREEN.search(decls)
+                ):
+                    for sel in raw_selectors.split(","):
+                        clean_sel = re.sub(r"::?[a-zA-Z-]+(?:\([^)]*\))?", "", sel).strip()
+                        if not clean_sel or clean_sel.startswith("@") or clean_sel.lower() in ("html", "head", "body"):
+                            continue
+                        try:
+                            for matched_el in list(soup.select(clean_sel)):
+                                if matched_el.name not in ("html", "head", "body", "style", "script"):
+                                    if "css_stylesheet_hidden" not in signals:
+                                        signals.append("css_stylesheet_hidden")
+                                    sanitized_count += 1
+                                    if self.mode == "sanitize":
+                                        matched_el.decompose()
+                        except Exception:
+                            pass
+
+        # 3. Inspect inline CSS styles and HTML5 `hidden` attributes for stealth payloads
         for el in list(soup.find_all(True)):
             if el.attrs is None:
                 continue
+            if "hidden" in el.attrs and el.get_text(" ", strip=True):
+                if "css_display_none" not in signals:
+                    signals.append("css_display_none")
+                sanitized_count += 1
+                if self.mode == "sanitize":
+                    el.decompose()
+                continue
+
             style = str(el.attrs.get("style", "") or "")
             if not style:
                 continue

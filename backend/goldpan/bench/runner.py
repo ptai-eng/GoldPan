@@ -330,7 +330,7 @@ class GoldPanBenchRunner:
         track_b = self.run_track_b(device_override=device_override)
         track_a = self.run_track_a()
         return {
-            "version": "3.0.0",
+            "version": "3.2.0",
             "track_b": track_b,
             "track_a": track_a,
         }
@@ -343,7 +343,7 @@ class GoldPanBenchRunner:
         sys_map = tb["systems"]
 
         lines = [
-            "# GoldPan AI v3.0 — Dual-Track Benchmark Report (`GoldPan Bench`)",
+            "# GoldPan AI v3.2 — Dual-Track Benchmark Report (`GoldPan Bench`)",
             "",
             "## Hardware & Execution Telemetry",
             f"- **Active Execution Provider:** `{tb['active_provider']}` ({tb['provider_tier']})",

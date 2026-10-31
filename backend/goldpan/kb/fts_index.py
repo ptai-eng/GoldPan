@@ -211,6 +211,25 @@ class SQLiteFTS5Index:
                 )
         return results
 
+    def delete_chunks(self, chunk_ids: list[str] | None = None, document_id: str | None = None) -> int:
+        """Delete chunks by explicit chunk_ids or by document_id prefix from FTS5 and meta tables."""
+        deleted = 0
+        with self._connect() as conn:
+            target_ids: set[str] = set(chunk_ids or [])
+            if document_id:
+                rows = conn.execute(
+                    "SELECT chunk_id FROM kb_chunks_meta WHERE chunk_id LIKE ?",
+                    (f"{document_id}_chunk_%",),
+                ).fetchall()
+                for r in rows:
+                    target_ids.add(str(r["chunk_id"]))
+            for cid in target_ids:
+                conn.execute("DELETE FROM kb_chunks_fts WHERE chunk_id = ?", (cid,))
+                cur = conn.execute("DELETE FROM kb_chunks_meta WHERE chunk_id = ?", (cid,))
+                deleted += cur.rowcount
+            conn.commit()
+        return deleted
+
     def count(self) -> int:
         with self._connect() as conn:
             row = conn.execute("SELECT COUNT(*) AS cnt FROM kb_chunks_meta").fetchone()
