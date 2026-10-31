@@ -1,0 +1,37 @@
+name: "🛡️ Prompt Injection Sample / Firewall Bypass"
+description: "Submit a new prompt injection attack pattern or report a firewall false positive/negative."
+title: "[Security]: "
+labels: ["security", "firewall", "benchmark"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GoldPan AI is an open, privacy-first Agent Context Firewall. We welcome community adversarial samples to stress-test Track A benchmarks!
+  - type: dropdown
+    id: category
+    attributes:
+      label: Vulnerability / Sample Category
+      options:
+        - "Hidden DOM / Dynamic CSS Injection"
+        - "Stealth PDF / DOCX Payload"
+        - "Unicode Tags / Zero-Width / Delimiter Spoofing"
+        - "Markdown Exfiltration Beacon"
+        - "Semantic / Imperative Override Attack"
+        - "False Positive (Benign document falsely blocked)"
+    validations:
+      required: true
+  - type: textarea
+    id: sample-content
+    attributes:
+      label: Raw Sample Payload
+      description: The exact payload or document snippet that bypassed or was falsely blocked.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: observed-behavior
+    attributes:
+      label: Observed vs Expected Behavior
+      description: What did GoldPan firewall do (`risk_score`, signals), and what should it do?
+    validations:
+      required: true

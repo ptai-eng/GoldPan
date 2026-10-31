@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Sparkles, FileText, CheckCircle2, FileJson, Link as LinkIcon, Download, Save, Maximize2, Minimize2, Trash2, UploadCloud, Loader2, X, LayoutTemplate, Database, Settings, ChevronRight, Clock, Menu } from "lucide-react";
+import { Search, Sparkles, FileText, CheckCircle2, FileJson, Link as LinkIcon, Download, Save, Maximize2, Minimize2, Trash2, UploadCloud, Loader2, X, LayoutTemplate, Database, Settings, ChevronRight, Clock, Menu, ShieldAlert, ShieldCheck } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 
 export default function Home() {
@@ -10,9 +10,10 @@ export default function Home() {
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [enableOcr, setEnableOcr] = useState<boolean>(true);
   
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [result, setResult] = useState<{ markdown: string; metadata: any } | null>(null);
+  const [result, setResult] = useState<{ markdown: string; metadata: any; _meta?: any } | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [apiKey, setApiKey] = useState("");
   
@@ -210,6 +211,7 @@ export default function Home() {
     
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("enable_ocr", String(enableOcr));
     try {
       const headers: Record<string, string> = {};
       if (apiKey) headers["X-Gemini-Api-Key"] = apiKey;
@@ -487,6 +489,19 @@ export default function Home() {
                         )}
                       </div>
 
+                      <div className="flex items-center justify-between px-1 text-xs">
+                        <label className="flex items-center gap-2 text-muted-foreground hover:text-foreground cursor-pointer select-none transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={enableOcr}
+                            onChange={(e) => setEnableOcr(e.target.checked)}
+                            className="w-3.5 h-3.5 rounded border-border accent-emerald-500 cursor-pointer"
+                          />
+                          <span>Offline OCR for Scans & Images</span>
+                        </label>
+                        <span className="text-[10px] font-mono text-muted-foreground/70">RapidOCR / ONNX</span>
+                      </div>
+
                       <button 
                         onClick={processFile}
                         disabled={!file || status === "loading"}
@@ -571,6 +586,25 @@ export default function Home() {
                           (result.metadata.stats.semantic_noise_removed_bytes || 0)
                         ).toLocaleString()} B noise
                       </span>
+                    </span>
+                  )}
+                  {result?._meta?.provenance?.firewall && (
+                    result._meta.provenance.firewall.is_suspicious ? (
+                      <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-mono text-rose-300 bg-rose-950/50 border border-rose-800 px-2.5 py-0.5 rounded-full" title={`Detected injection signals: ${(result._meta.provenance.firewall.signals || []).join(', ')}`}>
+                        <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                        <span>Firewall Alert (Risk: {(result._meta.provenance.firewall.risk_score || 0).toFixed(2)})</span>
+                      </span>
+                    ) : (
+                      <span className="hidden md:inline-flex items-center gap-1.5 text-[11px] font-mono text-emerald-300 bg-emerald-950/40 border border-emerald-800/60 px-2.5 py-0.5 rounded-full">
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>Firewall: Clean & Verified</span>
+                      </span>
+                    )
+                  )}
+                  {(result?.metadata?.ocr || result?.metadata?.is_scanned) && (
+                    <span className="hidden lg:inline-flex items-center gap-1.5 text-[11px] font-mono text-cyan-300 bg-cyan-950/40 border border-cyan-800/60 px-2.5 py-0.5 rounded-full">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>OCR Active</span>
                     </span>
                   )}
                 </div>

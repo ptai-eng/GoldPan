@@ -78,6 +78,7 @@ class HybridWebExtractor:
 
         html = ""
         soup = None
+        computed_hidden_stripped = 0
 
         try:
             response = requests.get(url, headers=DEFAULT_HEADERS, timeout=12)
@@ -87,22 +88,38 @@ class HybridWebExtractor:
             text_len = len(soup.get_text(strip=True))
 
             if text_len < 500 and self.use_playwright_fallback:
-                pw_html = self._extract_with_playwright(url)
+                pw_html, stripped = self._extract_with_playwright(url)
                 if pw_html:
                     html = pw_html
+                    computed_hidden_stripped += stripped
                     soup = BeautifulSoup(html, "html.parser")
         except Exception as req_err:
             if self.use_playwright_fallback:
-                pw_html = self._extract_with_playwright(url)
+                pw_html, stripped = self._extract_with_playwright(url)
                 if not pw_html:
                     raise req_err
                 html = pw_html
+                computed_hidden_stripped += stripped
                 soup = BeautifulSoup(html, "html.parser")
             else:
                 raise req_err
 
         # Step 1.5: Agent Context Firewall HTML/CSS DOM sanitization BEFORE Trafilatura
         cleaned_html, fw_report = self.firewall.process_html(html)
+        if computed_hidden_stripped > 0:
+            fw_report.sanitized_count += computed_hidden_stripped
+            if "playwright_computed_css_hidden" not in fw_report.signals:
+                fw_report.signals.append("playwright_computed_css_hidden")
+            fw_report.is_suspicious = True
+            fw_report.risk_score = max(fw_report.risk_score, 0.85)
+            if self.firewall_mode == "strict":
+                from ..core.exceptions import PromptInjectionBlockedError
+                raise PromptInjectionBlockedError(
+                    f"Prompt injection blocked by Tier-2 Playwright Computed-Style Firewall: {computed_hidden_stripped} elements hidden via external CSS.",
+                    risk_score=fw_report.risk_score,
+                    signals=fw_report.signals,
+                )
+
         soup = BeautifulSoup(cleaned_html, "html.parser")
 
         # Step 2: Extract main content via Trafilatura
@@ -136,7 +153,13 @@ class HybridWebExtractor:
             original_format="html",
         )
 
-    def _extract_with_playwright(self, url: str) -> str | None:
+    def _extract_with_playwright(self, url: str) -> tuple[str | None, int]:
+        """
+        Tier-2 Computed-Style DOM Firewall:
+        Uses headless Chromium via Playwright to evaluate rendered computed styles
+        (window.getComputedStyle), stripping elements hidden via external CSS stylesheets,
+        dynamic stylesheets, or transform off-screen positioning before serializing HTML.
+        """
         try:
             from playwright.sync_api import sync_playwright
 
@@ -144,9 +167,36 @@ class HybridWebExtractor:
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page(user_agent=DEFAULT_HEADERS["User-Agent"])
                 page.goto(url, wait_until="domcontentloaded", timeout=15000)
+
+                stripped_count = page.evaluate("""
+                    () => {
+                        let count = 0;
+                        const elements = Array.from(document.querySelectorAll('*'));
+                        for (const el of elements) {
+                            try {
+                                if (['HTML', 'HEAD', 'BODY', 'META', 'TITLE', 'SCRIPT', 'STYLE', 'LINK'].includes(el.tagName)) continue;
+                                const style = window.getComputedStyle(el);
+                                const isHidden = 
+                                    style.display === 'none' ||
+                                    style.visibility === 'hidden' ||
+                                    parseFloat(style.opacity) === 0 ||
+                                    parseFloat(style.fontSize) <= 1 ||
+                                    style.clip === 'rect(0px, 0px, 0px, 0px)' ||
+                                    style.clipPath === 'inset(50%)' ||
+                                    (style.transform && style.transform.includes('-9999'));
+
+                                if (isHidden) {
+                                    el.remove();
+                                    count++;
+                                }
+                            } catch (e) {}
+                        }
+                        return count;
+                    }
+                """)
                 html = page.content()
                 browser.close()
-                return html
+                return html, int(stripped_count or 0)
         except Exception as e:
             print(f"[Playwright Fallback] Warning: {e}")
-            return None
+            return None, 0

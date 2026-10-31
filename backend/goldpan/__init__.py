@@ -1,4 +1,4 @@
-"""GoldPan AI v3.1 — Privacy-First Multimodal Data Refinery, Offline Vietnamese OCR, Multilingual E5 ONNX RAG, Context Firewall & MCP Engine."""
+"""GoldPan AI v3.2 — Privacy-First Multimodal Data Refinery, Playwright Tier-2 Firewall, Offline Vietnamese OCR, Multilingual E5 ONNX RAG & MCP Server."""
 
-__version__ = "3.1.0"
+__version__ = "3.2.0"
 

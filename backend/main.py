@@ -8,7 +8,7 @@ from typing import Optional
 # Fix path to allow importing from backend/goldpan
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI, File, Header, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from pydantic import BaseModel
@@ -27,8 +27,8 @@ from goldpan.kb.onnx_embedder import collect_doctor_diagnostics
 
 app = FastAPI(
     title="GoldPan AI API",
-    description="Privacy-First Multimodal Data Refinery, Offline Vietnamese OCR, Multilingual E5 ONNX RAG & Agent Context Firewall",
-    version="3.1.0",
+    description="Privacy-First Multimodal Data Refinery, Playwright Tier-2 Firewall, Offline Vietnamese OCR, Multilingual E5 ONNX RAG & Agent Context Firewall",
+    version="3.2.0",
 )
 
 # Enable CORS for Next.js frontend
@@ -331,6 +331,7 @@ def extract_url(req: UrlRequest, x_gemini_api_key: Optional[str] = Header(None))
 @app.post("/api/extract/file")
 def extract_file(
     file: UploadFile = File(...),
+    enable_ocr: bool = Form(True),
     x_gemini_api_key: Optional[str] = Header(None),
     x_firewall_mode: Optional[str] = Header("sanitize"),
 ):
@@ -356,7 +357,13 @@ def extract_file(
             )
 
         fw_mode = x_firewall_mode or "sanitize"
-        pipeline = get_pipeline(file_path, is_file=True, api_key=x_gemini_api_key, firewall_mode=fw_mode)
+        pipeline = get_pipeline(
+            file_path,
+            is_file=True,
+            api_key=x_gemini_api_key,
+            firewall_mode=fw_mode,
+            enable_ocr=enable_ocr,
+        )
         result = pipeline.process(file_path)
 
         clean_title = result.doc_info.title
@@ -446,4 +453,4 @@ def ocr_endpoint(file: UploadFile = File(...)):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "version": "3.1.0"}
+    return {"status": "ok", "version": "3.2.0"}

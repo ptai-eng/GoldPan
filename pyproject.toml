@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "goldpan"
-version = "3.1.0"
-description = "Privacy-First Multimodal Data Refinery, Offline Vietnamese OCR, Multilingual E5 ONNX + SQLite FTS5 RAG, Agent Context Firewall & MCP Server"
+version = "3.2.0"
+description = "Privacy-First Multimodal Data Refinery, Playwright Tier-2 Firewall, Offline Vietnamese OCR, Multilingual E5 ONNX + SQLite FTS5 RAG & MCP Server"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [

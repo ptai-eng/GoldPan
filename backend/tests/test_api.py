@@ -18,7 +18,7 @@ def test_health_endpoint():
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "ok"
-    assert data["version"] == "3.1.0"
+    assert data["version"] == "3.2.0"
 
 
 def test_doctor_and_audit_endpoints():

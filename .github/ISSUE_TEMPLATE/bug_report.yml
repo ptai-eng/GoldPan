@@ -1,0 +1,37 @@
+name: "🐛 Bug Report"
+description: "Report a bug or unexpected behavior in GoldPan AI."
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting an issue! Please provide as much context as possible to help us reproduce and fix it quickly.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: "When extracting file X with OCR enabled,..."
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment Info
+      description: OS version, Python version, GPU model, and GoldPan version.
+      placeholder: "Windows 11 / AMD Radeon RX 6600 / Python 3.12 / GoldPan v3.2.0"
+    validations:
+      required: true
+  - type: textarea
+    id: doctor-output
+    attributes:
+      label: GoldPan Doctor Output
+      description: Paste the output of running `goldpan doctor` or `python -m goldpan.cli doctor`.
+      render: shell
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Traceback / Logs
+      description: Terminal logs or browser console errors.
+      render: shell

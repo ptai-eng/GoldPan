@@ -1,0 +1,23 @@
+name: "✨ Feature Request"
+description: "Suggest a new idea or capability for GoldPan AI."
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to make GoldPan AI faster, more accurate, or better protected against injection? Let us know!
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem or missing functionality?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / Architecture
+      description: Describe your proposed solution or API change.
+    validations:
+      required: true

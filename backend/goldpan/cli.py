@@ -18,7 +18,7 @@ from .mcp_server import GoldPanMCPServer
 
 app = typer.Typer(
     name="goldpan",
-    help="GoldPan AI v3.1 — Privacy-First Multimodal Data Refinery, Offline Vietnamese OCR, Multilingual E5 ONNX RAG, Context Firewall & MCP Engine.",
+    help="GoldPan AI v3.2 — Privacy-First Multimodal Data Refinery, Playwright Tier-2 Firewall, Offline Vietnamese OCR, Multilingual E5 ONNX RAG & MCP Engine.",
     add_completion=False,
 )
 console = Console()
@@ -236,7 +236,7 @@ def doctor_cmd(
         typer.echo(json.dumps(diag, ensure_ascii=False, indent=2))
         return
 
-    table = Table(title="GoldPan AI v3.1 — System & Hardware Doctor", show_header=True)
+    table = Table(title="GoldPan AI v3.2 — System & Hardware Doctor", show_header=True)
     table.add_column("Diagnostic Check", style="bold cyan")
     table.add_column("Status / Value", style="white")
     table.add_row("Operating System", str(diag["os"]))
