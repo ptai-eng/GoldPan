@@ -1,10 +1,11 @@
-# GoldPan AI v3.2 — Dual-Track Benchmark Report (`GoldPan Bench`)
+# GoldPan AI v3.3 — Triple-Track Benchmark Report (`GoldPan Bench`)
 
 ## Hardware & Execution Telemetry
 - **Active Execution Provider:** `CPUExecutionProvider` (Tier 1 (Default & CI-Tested CPU SIMD))
 - **Model Precision & Batch Size:** `INT8` (`batch_size=32`)
 - **Track B Dataset SHA-256:** `91c34534d0dec74a...` (10 docs, 16 queries)
 - **Track A Dataset SHA-256:** `63223031148ecd6d...` (13 attacks, 4 hard negatives)
+- **Track C Dataset SHA-256:** `234c1621b401dc38...` (12 attacks, 8 hard negatives)
 
 ---
 
@@ -13,8 +14,8 @@
 | System | Recall@1 (95% Wilson CI) | Recall@3 (95% Wilson CI) | MRR@5 | Avg Latency (ms/query) |
 | :--- | :---: | :---: | :---: | :---: |
 | **BM25-only (Surface Lexical)** | `50.0%` (`[28.0%, 72.0%]`) | `62.5%` (`[38.6%, 81.5%]`) | `0.5677` | `0.07 ms` |
-| **v2.1 (MiniLM-L6 + In-Memory BM25 RRF)** | `62.5%` (`[38.6%, 81.5%]`) | `81.2%` (`[57.0%, 93.4%]`) | `0.7104` | `2.92 ms` |
-| **v3.0 (E5-small ONNX + SQLite FTS5 + Breadcrumb + VNI/TCVN3)** | `87.5%` (`[64.0%, 96.5%]`) | `93.8%` (`[71.7%, 98.9%]`) | `0.8958` | `5.33 ms` |
+| **v2.1 (MiniLM-L6 + In-Memory BM25 RRF)** | `68.8%` (`[44.4%, 85.8%]`) | `81.2%` (`[57.0%, 93.4%]`) | `0.7417` | `3.80 ms` |
+| **v3.0 (E5-small ONNX + SQLite FTS5 + Breadcrumb + VNI/TCVN3)** | `87.5%` (`[64.0%, 96.5%]`) | `93.8%` (`[71.7%, 98.9%]`) | `0.8958` | `6.02 ms` |
 
 ### Track B Breakdown by Query Category (`v3.0 E5-small + SQLite FTS5`)
 
@@ -36,3 +37,13 @@
 | **Hard-Negative False Positive Rate (FPR)** | `0.0%` | `[0.0%, 49.0%]` | `<= 5.0%` (0% ideal) |
 | **Benign Content Preservation Rate** | `100.0%` | — | `100.0%` |
 | **Firewall Overhead Latency** | `0.21 ms/doc` | — | `< 25.0 ms/doc` |
+
+---
+
+## Track C: Repo Context Firewall (Codebase Prompt Injection Defense)
+
+| Metric | Score | 95% Wilson Confidence Interval | Target Gate |
+| :--- | :---: | :---: | :---: |
+| **Attack Detection Rate (TPR)** | `100.0%` | `[75.8%, 100.0%]` | `>= 95.0%` |
+| **Hard-Negative False Positive Rate (FPR)** | `0.0%` | `[0.0%, 32.4%]` | `<= 0.0%` (0% ideal) |
+| **Firewall Scan Latency** | `1.77 ms/file` | — | `< 10.0 ms/file` |

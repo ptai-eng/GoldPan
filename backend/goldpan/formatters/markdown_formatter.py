@@ -24,7 +24,9 @@ class AIFriendlyMarkdownFormatter:
 
         # 0.5. Run Agent Context Firewall text inspection & sanitization
         prior_fw_dict = (content.doc_info.metadata or {}).get("firewall")
-        prior_report = FirewallReport(**prior_fw_dict) if isinstance(prior_fw_dict, dict) else None
+        prior_report = (
+            FirewallReport(**prior_fw_dict) if isinstance(prior_fw_dict, dict) else None
+        )
         text, fw_report = self.firewall.process_text(text, prior_report=prior_report)
 
         lines = text.split("\n")

@@ -1,4 +1,5 @@
 import os
+
 import requests
 
 SAMPLES_DIR = os.path.join(os.path.dirname(__file__), "samples")
@@ -10,7 +11,7 @@ texts = {
     "sample.csv": "id,name,age\n1,Alice,30\n2,Bob,25",
     "sample.json": '{"name": "GoldPan", "version": "1.2"}',
     "sample.md": "# Markdown\n\nThis is a **markdown** file.",
-    "sample.xml": "<note><to>User</to><from>GoldPan</from><body>Hello!</body></note>"
+    "sample.xml": "<note><to>User</to><from>GoldPan</from><body>Hello!</body></note>",
 }
 
 for filename, content in texts.items():
@@ -18,7 +19,10 @@ for filename, content in texts.items():
         f.write(content)
 
 # 2. Heavy files (Simulate large documents > 1MB)
-heavy_text = "This is a heavy paragraph containing useless noise and some valuable information. " * 50000 # ~4MB file
+heavy_text = (
+    "This is a heavy paragraph containing useless noise and some valuable information. "
+    * 50000
+)  # ~4MB file
 with open(os.path.join(SAMPLES_DIR, "heavy_sample.txt"), "w", encoding="utf-8") as f:
     f.write(heavy_text)
 

@@ -12,6 +12,7 @@ from typing import Any
 from ..firewall.context_firewall import AgentContextFirewall
 from ..kb.chroma_manager import ChromaManager
 from ..kb.onnx_embedder import select_onnx_providers
+from ..scan.scanner import CodeScanner
 from .metrics import (
     compute_dataset_sha256,
     compute_mrr_at_k,
@@ -21,7 +22,7 @@ from .metrics import (
 
 
 class GoldPanBenchRunner:
-    """Executes Track A (Firewall Security) and Track B (Multilingual Retrieval) benchmarks."""
+    """Executes Track A (Firewall Security), Track B (Multilingual Retrieval), and Track C (Repo Firewall) benchmarks."""
 
     def __init__(self, datasets_dir: str | Path | None = None) -> None:
         if datasets_dir is None:
@@ -29,6 +30,7 @@ class GoldPanBenchRunner:
         self.datasets_dir = Path(datasets_dir)
         self.track_a_path = self.datasets_dir / "track_a_firewall.json"
         self.track_b_path = self.datasets_dir / "track_b_multilingual.json"
+        self.track_c_path = self.datasets_dir / "track_c_repo.json"
 
     def run_track_b(self, device_override: str | None = None) -> dict[str, Any]:
         """Run Track B: Compare BM25-only, v2.1 MiniLM+BM25 RRF, and v3.0 E5+FTS5+Breadcrumb RRF."""
@@ -64,7 +66,9 @@ class GoldPanBenchRunner:
                     idf = math.log(1.0 + (n_docs - nq + 0.5) / (nq + 0.5))
                     sc += idf * ((tf * 2.5) / (tf + 1.5 * (0.25 + 0.75 * (dl / avgdl))))
                 scores.append(sc)
-            ranked_idx = sorted(range(len(corpus_ids)), key=lambda i: scores[i], reverse=True)
+            ranked_idx = sorted(
+                range(len(corpus_ids)), key=lambda i: scores[i], reverse=True
+            )
             return [corpus_ids[i] for i in ranked_idx if scores[i] > 0][:5]
 
         # 2. System 2 (v2.1 MiniLM + BM25 RRF) & System 3 (v3.0 E5 + SQLite FTS5 + VNI/TCVN3 + Breadcrumb RRF)
@@ -72,7 +76,9 @@ class GoldPanBenchRunner:
             tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_v2,
             tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_v3,
         ):
-            kb_v2 = ChromaManager(persist_dir=tmp_v2, embedding_model="all-MiniLM-L6-v2")
+            kb_v2 = ChromaManager(
+                persist_dir=tmp_v2, embedding_model="all-MiniLM-L6-v2"
+            )
             kb_v3 = ChromaManager(
                 persist_dir=tmp_v3,
                 embedding_model="multilingual-e5-small",
@@ -92,18 +98,27 @@ class GoldPanBenchRunner:
                 )
 
             systems = {
-                "bm25_only": {"label": "BM25-only (Surface Lexical)", "fn": query_bm25_only},
+                "bm25_only": {
+                    "label": "BM25-only (Surface Lexical)",
+                    "fn": query_bm25_only,
+                },
                 "v2_1_minilm_rrf": {
                     "label": "v2.1 (MiniLM-L6 + In-Memory BM25 RRF)",
                     "fn": lambda q: [
-                        str(r["metadata"].get("doc_id") or r["metadata"].get("source", ""))
+                        str(
+                            r["metadata"].get("doc_id")
+                            or r["metadata"].get("source", "")
+                        )
                         for r in kb_v2.query_hybrid(q, n_results=5)
                     ],
                 },
                 "v3_0_e5_fts5_rrf": {
                     "label": "v3.0 (E5-small ONNX + SQLite FTS5 + Breadcrumb + VNI/TCVN3)",
                     "fn": lambda q: [
-                        str(r["metadata"].get("doc_id") or r["metadata"].get("source", ""))
+                        str(
+                            r["metadata"].get("doc_id")
+                            or r["metadata"].get("source", "")
+                        )
                         for r in kb_v3.query_hybrid(q, n_results=5)
                     ],
                 },
@@ -138,7 +153,12 @@ class GoldPanBenchRunner:
                     mrr_sum += mrr
 
                     if cat not in by_category:
-                        by_category[cat] = {"total": 0, "r1_hits": 0, "r3_hits": 0, "mrr_sum": 0.0}
+                        by_category[cat] = {
+                            "total": 0,
+                            "r1_hits": 0,
+                            "r3_hits": 0,
+                            "mrr_sum": 0.0,
+                        }
                     by_category[cat]["total"] += 1
                     by_category[cat]["r1_hits"] += int(r1 > 0)
                     by_category[cat]["r3_hits"] += int(r3 > 0)
@@ -216,8 +236,12 @@ class GoldPanBenchRunner:
                 cleaned_html, html_rep = firewall.process_html(content)
                 from bs4 import BeautifulSoup
 
-                visible_text = BeautifulSoup(cleaned_html, "html.parser").get_text(" ", strip=True)
-                final_text, report = firewall.process_text(visible_text, prior_report=html_rep)
+                visible_text = BeautifulSoup(cleaned_html, "html.parser").get_text(
+                    " ", strip=True
+                )
+                final_text, report = firewall.process_text(
+                    visible_text, prior_report=html_rep
+                )
             else:
                 final_text, report = firewall.process_text(content)
             elapsed_ms = (time.perf_counter() - t0) * 1000.0
@@ -284,8 +308,10 @@ class GoldPanBenchRunner:
                     "detected": docx_rep.is_suspicious,
                     "risk_score": docx_rep.risk_score,
                     "signals": docx_rep.signals,
-                    "no_forbidden_leaked": "EXFILTRATE DATABASE" not in (docx_clean or ""),
-                    "required_preserved": "Hợp đồng cung cấp dịch vụ" in (docx_clean or ""),
+                    "no_forbidden_leaked": "EXFILTRATE DATABASE"
+                    not in (docx_clean or ""),
+                    "required_preserved": "Hợp đồng cung cấp dịch vụ"
+                    in (docx_clean or ""),
                     "latency_ms": round(elapsed_ms, 3),
                 }
             )
@@ -306,13 +332,17 @@ class GoldPanBenchRunner:
             "sanitization_rate_ci95": [san_lo, san_hi],
             "hard_negative_fpr": fpr_est,
             "hard_negative_fpr_ci95": [fpr_lo, fpr_hi],
-            "hard_negative_preservation_rate": round(hn_preserved / max(1, hn_total), 4),
+            "hard_negative_preservation_rate": round(
+                hn_preserved / max(1, hn_total), 4
+            ),
             "avg_latency_ms_per_doc": mean_lat,
             "samples": sample_details,
         }
 
     @staticmethod
-    def _create_synthetic_vanish_docx(path: Path, visible_text: str, vanish_text: str) -> None:
+    def _create_synthetic_vanish_docx(
+        path: Path, visible_text: str, vanish_text: str
+    ) -> None:
         doc_xml = f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
   <w:body>
@@ -325,14 +355,91 @@ class GoldPanBenchRunner:
         with zipfile.ZipFile(str(path), "w") as zf:
             zf.writestr("word/document.xml", doc_xml.encode("utf-8"))
 
+    def run_track_c(self) -> dict[str, Any]:
+        """Run Track C: Evaluate Repo Context Firewall across codebase injection attacks and benign code."""
+        data = json.loads(self.track_c_path.read_text(encoding="utf-8"))
+        sha256 = compute_dataset_sha256(self.track_c_path)
+        samples: list[dict[str, Any]] = list(data["samples"])
+
+        attack_total = 0
+        attack_detected = 0
+        hn_total = 0
+        hn_false_positives = 0
+        latencies_ms: list[float] = []
+        sample_details: list[dict[str, Any]] = []
+
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+            tmp_root = Path(tmp_dir)
+
+            for item in samples:
+                sid = item["sample_id"]
+                is_attack = bool(item["is_attack"])
+                rel_fn = item["filename"]
+                content = item["content"]
+
+                # Put each sample in its own isolated subfolder to test isolated file walking
+                sample_dir = tmp_root / sid
+                sample_file = sample_dir / rel_fn
+                sample_file.parent.mkdir(parents=True, exist_ok=True)
+                sample_file.write_text(content, encoding="utf-8")
+
+                t0 = time.perf_counter()
+                scanner = CodeScanner(root_dir=sample_dir, mode="audit", profile="code")
+                rep = scanner.scan()
+                elapsed_ms = (time.perf_counter() - t0) * 1000.0
+                latencies_ms.append(elapsed_ms)
+
+                is_suspicious = rep.is_suspicious or len(rep.suspicious_files) > 0
+
+                if is_attack:
+                    attack_total += 1
+                    if is_suspicious:
+                        attack_detected += 1
+                else:
+                    hn_total += 1
+                    if is_suspicious:
+                        hn_false_positives += 1
+
+                sample_details.append(
+                    {
+                        "sample_id": sid,
+                        "category": item["category"],
+                        "filename": rel_fn,
+                        "is_attack": is_attack,
+                        "detected": is_suspicious,
+                        "risk_score": rep.highest_risk,
+                        "findings_count": len(rep.findings),
+                        "latency_ms": round(elapsed_ms, 3),
+                    }
+                )
+
+        tpr_est, tpr_lo, tpr_hi = wilson_ci_95(attack_detected, attack_total)
+        fpr_est, fpr_lo, fpr_hi = wilson_ci_95(hn_false_positives, hn_total)
+        mean_lat = round(sum(latencies_ms) / max(1, len(latencies_ms)), 3)
+
+        return {
+            "track": "Track C — Repo Context Firewall (Codebase Prompt Injection & Hard Negatives)",
+            "dataset_sha256": sha256,
+            "attack_samples": attack_total,
+            "hard_negative_samples": hn_total,
+            "detection_tpr": tpr_est,
+            "detection_tpr_ci95": [tpr_lo, tpr_hi],
+            "hard_negative_fpr": fpr_est,
+            "hard_negative_fpr_ci95": [fpr_lo, fpr_hi],
+            "avg_latency_ms_per_file": mean_lat,
+            "samples": sample_details,
+        }
+
     def run_all(self, device_override: str | None = None) -> dict[str, Any]:
-        """Run both Track A and Track B and return full structured benchmark results."""
+        """Run Track A, Track B, and Track C benchmarks."""
         track_b = self.run_track_b(device_override=device_override)
         track_a = self.run_track_a()
+        track_c = self.run_track_c()
         return {
-            "version": "3.2.0",
+            "version": "3.3.0",
             "track_b": track_b,
             "track_a": track_a,
+            "track_c": track_c,
         }
 
     @staticmethod
@@ -340,32 +447,41 @@ class GoldPanBenchRunner:
         """Render a publication-grade Markdown benchmark report with 95% Wilson CIs."""
         tb = results["track_b"]
         ta = results["track_a"]
+        tc = results.get("track_c")
         sys_map = tb["systems"]
 
         lines = [
-            "# GoldPan AI v3.2 — Dual-Track Benchmark Report (`GoldPan Bench`)",
+            "# GoldPan AI v3.3 — Triple-Track Benchmark Report (`GoldPan Bench`)",
             "",
             "## Hardware & Execution Telemetry",
             f"- **Active Execution Provider:** `{tb['active_provider']}` ({tb['provider_tier']})",
             f"- **Model Precision & Batch Size:** `{tb['precision']}` (`batch_size={tb['batch_size']}`)",
             f"- **Track B Dataset SHA-256:** `{tb['dataset_sha256'][:16]}...` ({tb['corpus_size']} docs, {tb['query_count']} queries)",
             f"- **Track A Dataset SHA-256:** `{ta['dataset_sha256'][:16]}...` ({ta['attack_samples']} attacks, {ta['hard_negative_samples']} hard negatives)",
-            "",
-            "---",
-            "",
-            "## Track B: Multilingual & Vietnamese Hybrid Retrieval",
-            "",
-            "| System | Recall@1 (95% Wilson CI) | Recall@3 (95% Wilson CI) | MRR@5 | Avg Latency (ms/query) |",
-            "| :--- | :---: | :---: | :---: | :---: |",
         ]
+        if tc:
+            lines.append(
+                f"- **Track C Dataset SHA-256:** `{tc['dataset_sha256'][:16]}...` ({tc['attack_samples']} attacks, {tc['hard_negative_samples']} hard negatives)"
+            )
+        lines.extend(
+            [
+                "",
+                "---",
+                "",
+                "## Track B: Multilingual & Vietnamese Hybrid Retrieval",
+                "",
+                "| System | Recall@1 (95% Wilson CI) | Recall@3 (95% Wilson CI) | MRR@5 | Avg Latency (ms/query) |",
+                "| :--- | :---: | :---: | :---: | :---: |",
+            ]
+        )
 
         for sys_key in ("bm25_only", "v2_1_minilm_rrf", "v3_0_e5_fts5_rrf"):
             s = sys_map[sys_key]
             r1_ci = s["recall_at_1_ci95"]
             r3_ci = s["recall_at_3_ci95"]
             lines.append(
-                f"| **{s['label']}** | `{s['recall_at_1']*100:.1f}%` (`[{r1_ci[0]*100:.1f}%, {r1_ci[1]*100:.1f}%]`) "
-                f"| `{s['recall_at_3']*100:.1f}%` (`[{r3_ci[0]*100:.1f}%, {r3_ci[1]*100:.1f}%]`) "
+                f"| **{s['label']}** | `{s['recall_at_1'] * 100:.1f}%` (`[{r1_ci[0] * 100:.1f}%, {r1_ci[1] * 100:.1f}%]`) "
+                f"| `{s['recall_at_3'] * 100:.1f}%` (`[{r3_ci[0] * 100:.1f}%, {r3_ci[1] * 100:.1f}%]`) "
                 f"| `{s['mrr_at_5']:.4f}` | `{s['avg_latency_ms']:.2f} ms` |"
             )
 
@@ -382,8 +498,8 @@ class GoldPanBenchRunner:
         for cat_name, c_info in v3_cats.items():
             ci = c_info["recall_at_3_ci95"]
             lines.append(
-                f"| `{cat_name}` | {c_info['queries']} | `{c_info['recall_at_1']*100:.1f}%` "
-                f"| `{c_info['recall_at_3']*100:.1f}%` (`[{ci[0]*100:.1f}%, {ci[1]*100:.1f}%]`) | `{c_info['mrr_at_5']:.4f}` |"
+                f"| `{cat_name}` | {c_info['queries']} | `{c_info['recall_at_1'] * 100:.1f}%` "
+                f"| `{c_info['recall_at_3'] * 100:.1f}%` (`[{ci[0] * 100:.1f}%, {ci[1] * 100:.1f}%]`) | `{c_info['mrr_at_5']:.4f}` |"
             )
 
         tpr_ci = ta["detection_tpr_ci95"]
@@ -399,12 +515,31 @@ class GoldPanBenchRunner:
                 "",
                 "| Metric | Score | 95% Wilson Confidence Interval | Target Gate |",
                 "| :--- | :---: | :---: | :---: |",
-                f"| **Attack Detection Rate (TPR)** | `{ta['detection_tpr']*100:.1f}%` | `[{tpr_ci[0]*100:.1f}%, {tpr_ci[1]*100:.1f}%]` | `>= 90.0%` |",
-                f"| **Payload Sanitization Rate** | `{ta['sanitization_rate']*100:.1f}%` | `[{san_ci[0]*100:.1f}%, {san_ci[1]*100:.1f}%]` | `>= 90.0%` |",
-                f"| **Hard-Negative False Positive Rate (FPR)** | `{ta['hard_negative_fpr']*100:.1f}%` | `[{fpr_ci[0]*100:.1f}%, {fpr_ci[1]*100:.1f}%]` | `<= 5.0%` (0% ideal) |",
-                f"| **Benign Content Preservation Rate** | `{ta['hard_negative_preservation_rate']*100:.1f}%` | — | `100.0%` |",
+                f"| **Attack Detection Rate (TPR)** | `{ta['detection_tpr'] * 100:.1f}%` | `[{tpr_ci[0] * 100:.1f}%, {tpr_ci[1] * 100:.1f}%]` | `>= 90.0%` |",
+                f"| **Payload Sanitization Rate** | `{ta['sanitization_rate'] * 100:.1f}%` | `[{san_ci[0] * 100:.1f}%, {san_ci[1] * 100:.1f}%]` | `>= 90.0%` |",
+                f"| **Hard-Negative False Positive Rate (FPR)** | `{ta['hard_negative_fpr'] * 100:.1f}%` | `[{fpr_ci[0] * 100:.1f}%, {fpr_ci[1] * 100:.1f}%]` | `<= 5.0%` (0% ideal) |",
+                f"| **Benign Content Preservation Rate** | `{ta['hard_negative_preservation_rate'] * 100:.1f}%` | — | `100.0%` |",
                 f"| **Firewall Overhead Latency** | `{ta['avg_latency_ms_per_doc']:.2f} ms/doc` | — | `< 25.0 ms/doc` |",
                 "",
             ]
         )
+
+        if tc:
+            tc_tpr_ci = tc["detection_tpr_ci95"]
+            tc_fpr_ci = tc["hard_negative_fpr_ci95"]
+            lines.extend(
+                [
+                    "---",
+                    "",
+                    "## Track C: Repo Context Firewall (Codebase Prompt Injection Defense)",
+                    "",
+                    "| Metric | Score | 95% Wilson Confidence Interval | Target Gate |",
+                    "| :--- | :---: | :---: | :---: |",
+                    f"| **Attack Detection Rate (TPR)** | `{tc['detection_tpr'] * 100:.1f}%` | `[{tc_tpr_ci[0] * 100:.1f}%, {tc_tpr_ci[1] * 100:.1f}%]` | `>= 95.0%` |",
+                    f"| **Hard-Negative False Positive Rate (FPR)** | `{tc['hard_negative_fpr'] * 100:.1f}%` | `[{tc_fpr_ci[0] * 100:.1f}%, {tc_fpr_ci[1] * 100:.1f}%]` | `<= 0.0%` (0% ideal) |",
+                    f"| **Firewall Scan Latency** | `{tc['avg_latency_ms_per_file']:.2f} ms/file` | — | `< 10.0 ms/file` |",
+                    "",
+                ]
+            )
+
         return "\n".join(lines)

@@ -10,8 +10,8 @@ from .runner import GoldPanBenchRunner
 
 __all__ = [
     "GoldPanBenchRunner",
-    "wilson_ci_95",
+    "compute_dataset_sha256",
     "compute_mrr_at_k",
     "compute_recall_at_k",
-    "compute_dataset_sha256",
+    "wilson_ci_95",
 ]

@@ -31,7 +31,6 @@ _VN_STOPWORDS = {
     "nao",
     "bao",
     "nhieu",
-    "the",
     "from",
     "with",
     "that",
@@ -60,8 +59,14 @@ _VN_STOPWORDS = {
 
 def _extract_search_tokens_and_bigrams(text: str, fold: bool = False) -> list[str]:
     """Tokenize text into unigrams and adjacent compound bigrams."""
-    target = fold_vietnamese_diacritics(text) if fold else normalize_vietnamese_text(text)[0].lower()
-    raw_words = [w.replace("/", "_").replace("-", "_") for w in _WORD_RE.findall(target)]
+    target = (
+        fold_vietnamese_diacritics(text)
+        if fold
+        else normalize_vietnamese_text(text)[0].lower()
+    )
+    raw_words = [
+        w.replace("/", "_").replace("-", "_") for w in _WORD_RE.findall(target)
+    ]
     words = [w for w in raw_words if len(w) > 1 or w.isdigit()]
     bigrams: list[str] = []
     for i in range(len(words) - 1):
@@ -122,8 +127,12 @@ class SQLiteFTS5Index:
         with self._connect() as conn:
             for cid, text, meta in zip(chunk_ids, texts, metadatas):
                 source = str(meta.get("source", ""))
-                nfc_tokens = " ".join(_extract_search_tokens_and_bigrams(text, fold=False))
-                folded_tokens = " ".join(_extract_search_tokens_and_bigrams(text, fold=True))
+                nfc_tokens = " ".join(
+                    _extract_search_tokens_and_bigrams(text, fold=False)
+                )
+                folded_tokens = " ".join(
+                    _extract_search_tokens_and_bigrams(text, fold=True)
+                )
 
                 conn.execute("DELETE FROM kb_chunks_fts WHERE chunk_id = ?", (cid,))
                 conn.execute(
@@ -211,7 +220,9 @@ class SQLiteFTS5Index:
                 )
         return results
 
-    def delete_chunks(self, chunk_ids: list[str] | None = None, document_id: str | None = None) -> int:
+    def delete_chunks(
+        self, chunk_ids: list[str] | None = None, document_id: str | None = None
+    ) -> int:
         """Delete chunks by explicit chunk_ids or by document_id prefix from FTS5 and meta tables."""
         deleted = 0
         with self._connect() as conn:
@@ -225,7 +236,9 @@ class SQLiteFTS5Index:
                     target_ids.add(str(r["chunk_id"]))
             for cid in target_ids:
                 conn.execute("DELETE FROM kb_chunks_fts WHERE chunk_id = ?", (cid,))
-                cur = conn.execute("DELETE FROM kb_chunks_meta WHERE chunk_id = ?", (cid,))
+                cur = conn.execute(
+                    "DELETE FROM kb_chunks_meta WHERE chunk_id = ?", (cid,)
+                )
                 deleted += cur.rowcount
             conn.commit()
         return deleted

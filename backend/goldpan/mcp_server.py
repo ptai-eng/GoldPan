@@ -4,7 +4,7 @@ import json
 import os
 import re
 import sys
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from . import __version__
 from .core.pipeline import GoldPanPipeline
@@ -14,7 +14,10 @@ from .extractors.markitdown_wrapper import MarkItDownExtractor
 from .extractors.web_extractor import HybridWebExtractor
 from .filters.heuristic_filter import HeuristicFilter
 from .filters.semantic_router import SemanticRouterFilter
-from .firewall.context_firewall import build_provenance_meta, spotlight_untrusted_content
+from .firewall.context_firewall import (
+    build_provenance_meta,
+    spotlight_untrusted_content,
+)
 from .formatters.markdown_formatter import AIFriendlyMarkdownFormatter
 from .kb.chroma_manager import ChromaManager, compute_document_id
 from .kb.onnx_embedder import collect_doctor_diagnostics
@@ -28,7 +31,7 @@ def _is_url(source: str) -> bool:
 
 def _build_pipeline(
     source: str,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
     use_playwright_fallback: bool = True,
     firewall_mode: str = "sanitize",
     enable_ocr: bool = True,
@@ -68,19 +71,23 @@ class GoldPanMCPServer:
 
     def __init__(
         self,
-        persist_directory: Optional[str] = None,
-        kb_dir: Optional[str] = None,
-        api_key: Optional[str] = None,
+        persist_directory: str | None = None,
+        kb_dir: str | None = None,
+        api_key: str | None = None,
     ) -> None:
-        repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        repo_root = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
         self.kb_dir = kb_dir or os.path.join(repo_root, "KB")
         os.makedirs(self.kb_dir, exist_ok=True)
         self.chroma = ChromaManager(persist_directory=persist_directory)
-        self.api_key = os.getenv("GEMINI_API_KEY") if api_key is None else (api_key or None)
+        self.api_key = (
+            os.getenv("GEMINI_API_KEY") if api_key is None else (api_key or None)
+        )
         if self.api_key:
             self.chroma.set_api_key(self.api_key)
 
-    def get_tools(self) -> List[Dict[str, Any]]:
+    def get_tools(self) -> list[dict[str, Any]]:
         return [
             {
                 "name": "goldpan_extract",
@@ -269,9 +276,48 @@ class GoldPanMCPServer:
                     "required": ["source"],
                 },
             },
+            {
+                "name": "goldpan_scan_repo",
+                "description": (
+                    "Scan a codebase repository for indirect prompt injection, hidden Unicode steganography, "
+                    "and malicious exfiltration beacons. Returns a bounded summary with provenance, coverage, "
+                    "and residual unknowns to keep agent context clean."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "default": ".",
+                            "description": "Directory or repository path to scan.",
+                        },
+                        "detail": {
+                            "type": "string",
+                            "enum": ["summary", "complete"],
+                            "default": "summary",
+                            "description": "Level of detail: 'summary' returns bounded findings (recommended for agent context); 'complete' exports full JSON report to file.",
+                        },
+                        "include": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Optional list of glob patterns to include (e.g. ['*.py', '*.md']).",
+                        },
+                        "exclude": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Optional list of glob patterns to exclude.",
+                        },
+                        "max_tokens": {
+                            "type": "integer",
+                            "default": 3000,
+                            "description": "Maximum estimated tokens to return in summary mode.",
+                        },
+                    },
+                },
+            },
         ]
 
-    def get_resources(self) -> List[Dict[str, Any]]:
+    def get_resources(self) -> list[dict[str, Any]]:
         docs = self.chroma.get_all_documents()
         resources = []
         for doc in docs:
@@ -288,7 +334,7 @@ class GoldPanMCPServer:
             )
         return resources
 
-    def read_resource(self, uri: str) -> Dict[str, Any]:
+    def read_resource(self, uri: str) -> dict[str, Any]:
         if not uri.startswith("goldpan://kb/"):
             raise ValueError(f"Unsupported resource URI: {uri}")
         doc_id = uri.replace("goldpan://kb/", "", 1).strip()
@@ -306,19 +352,27 @@ class GoldPanMCPServer:
                                 "text": text,
                             }
                         ],
-                        "_meta": build_provenance_meta(FirewallReport(mode="sanitize"), source=str(doc.get("source", p))),
+                        "_meta": build_provenance_meta(
+                            FirewallReport(mode="sanitize"),
+                            source=str(doc.get("source", p)),
+                        ),
                     }
         raise ValueError(f"Knowledge Base document not found for URI: {uri}")
 
-    def _save_physical_kb_file(self, doc_id: str, source_name: str, markdown: str) -> str:
-        safe_stem = re.sub(r'[\\/*?:"<>|]', "", os.path.basename(source_name))[:50] or "document"
+    def _save_physical_kb_file(
+        self, doc_id: str, source_name: str, markdown: str
+    ) -> str:
+        safe_stem = (
+            re.sub(r'[\\/*?:"<>|]', "", os.path.basename(source_name))[:50]
+            or "document"
+        )
         safe_filename = f"{safe_stem}_{doc_id[:8]}.md"
         physical_path = os.path.join(self.kb_dir, safe_filename)
         with open(physical_path, "w", encoding="utf-8") as f:
             f.write(markdown)
         return physical_path
 
-    def call_tool(self, name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def call_tool(self, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         if name == "goldpan_extract":
             source = str(arguments.get("source", "")).strip()
             if not source or "\x00" in source:
@@ -348,13 +402,18 @@ class GoldPanMCPServer:
             total_chars = len(full_text)
             fw_report = result.firewall or FirewallReport(mode=firewall_mode)
 
-            residual_unknowns: List[str] = []
+            residual_unknowns: list[str] = []
             router_mode = result.stats.get("router_mode", "local_heuristic")
             if router_mode == "local_heuristic":
                 residual_unknowns.append(
                     "SemanticRouterFilter executed in local_heuristic mode (no GEMINI_API_KEY configured or document < 1000 chars)."
                 )
-            if not _is_url(source) and os.path.splitext(source)[1].lower() in [".jpg", ".jpeg", ".png", ".webp"] and not self.api_key:
+            if (
+                not _is_url(source)
+                and os.path.splitext(source)[1].lower()
+                in [".jpg", ".jpeg", ".png", ".webp"]
+                and not self.api_key
+            ):
                 residual_unknowns.append(
                     "Image processed via local Pillow EXIF/geometry inspector; Cloud Vision OCR was not invoked."
                 )
@@ -369,7 +428,9 @@ class GoldPanMCPServer:
                 )
 
             if spotlight:
-                output_text = spotlight_untrusted_content(output_text, source=source, report=fw_report)
+                output_text = spotlight_untrusted_content(
+                    output_text, source=source, report=fw_report
+                )
 
             ingested_info = None
             if ingest_to_kb:
@@ -383,7 +444,9 @@ class GoldPanMCPServer:
                     "file_path": result.doc_info.file_path,
                     "physical_file": physical_path,
                 }
-                emb_mode = self.chroma.ingest_document(document_id=doc_id, text=full_text, metadata=meta)
+                emb_mode = self.chroma.ingest_document(
+                    document_id=doc_id, text=full_text, metadata=meta
+                )
                 ingested_info = {
                     "document_id": doc_id,
                     "embedding_mode": emb_mode,
@@ -405,7 +468,9 @@ class GoldPanMCPServer:
                 "firewall": fw_report.model_dump(),
                 "ingested": ingested_info,
                 "coverage": {
-                    "completeness": "partial" if (truncated or router_mode == "local_heuristic") else "complete",
+                    "completeness": "partial"
+                    if (truncated or router_mode == "local_heuristic")
+                    else "complete",
                     "router_mode": router_mode,
                     "total_chars": total_chars,
                     "returned_chars": len(output_text),
@@ -414,7 +479,12 @@ class GoldPanMCPServer:
                 "_meta": meta_obj,
             }
             return {
-                "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, indent=2)}],
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(payload, ensure_ascii=False, indent=2),
+                    }
+                ],
                 "_meta": payload["_meta"],
             }
 
@@ -436,7 +506,9 @@ class GoldPanMCPServer:
                 "file_path": None if _is_url(source) else source,
                 "physical_file": physical_path,
             }
-            emb_mode = self.chroma.ingest_document(document_id=doc_id, text=markdown, metadata=meta)
+            emb_mode = self.chroma.ingest_document(
+                document_id=doc_id, text=markdown, metadata=meta
+            )
             chunks_count = len(self.chroma._chunk_text(markdown))
 
             payload = {
@@ -453,7 +525,14 @@ class GoldPanMCPServer:
                 },
                 "residual_unknowns": [],
             }
-            return {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, indent=2)}]}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(payload, ensure_ascii=False, indent=2),
+                    }
+                ]
+            }
 
         elif name == "goldpan_kb_search":
             query = str(arguments.get("query", "")).strip()
@@ -464,7 +543,7 @@ class GoldPanMCPServer:
             spotlight = bool(arguments.get("spotlight", False))
 
             hits = self.chroma.search_with_citations(query, n_results=n_results)
-            residual_unknowns: List[str] = []
+            residual_unknowns: list[str] = []
             if not self.api_key and self.chroma.gemini_collection.count() > 0:
                 residual_unknowns.append(
                     "Cloud collection 'goldpan_kb_gemini' contains vectors but was skipped because GEMINI_API_KEY is not set; searched local E5 ONNX + SQLite FTS5 only."
@@ -494,7 +573,9 @@ class GoldPanMCPServer:
                     }
                 )
 
-            meta_obj = build_provenance_meta(FirewallReport(mode="sanitize"), source="goldpan_kb")
+            meta_obj = build_provenance_meta(
+                FirewallReport(mode="sanitize"), source="goldpan_kb"
+            )
             payload = {
                 "query": query,
                 "detail": detail,
@@ -504,13 +585,20 @@ class GoldPanMCPServer:
                     "completeness": "partial" if residual_unknowns else "complete",
                     "local_collection_chunks": self.chroma.local_collection.count(),
                     "gemini_collection_chunks": self.chroma.gemini_collection.count(),
-                    "sqlite_fts5_chunks": self.chroma.fts_index.count() if self.chroma.fts_index else 0,
+                    "sqlite_fts5_chunks": self.chroma.fts_index.count()
+                    if self.chroma.fts_index
+                    else 0,
                 },
                 "residual_unknowns": residual_unknowns,
                 "_meta": meta_obj,
             }
             return {
-                "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, indent=2)}],
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(payload, ensure_ascii=False, indent=2),
+                    }
+                ],
                 "_meta": payload["_meta"],
             }
 
@@ -526,7 +614,14 @@ class GoldPanMCPServer:
                 },
                 "residual_unknowns": [],
             }
-            return {"content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, indent=2)}]}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(payload, ensure_ascii=False, indent=2),
+                    }
+                ]
+            }
 
         elif name == "goldpan_kb_delete":
             doc_id = str(arguments.get("document_id", "")).strip()
@@ -543,18 +638,35 @@ class GoldPanMCPServer:
                 "content": [
                     {
                         "type": "text",
-                        "text": json.dumps({"status": "success", "deleted_document_id": doc_id}, indent=2),
+                        "text": json.dumps(
+                            {"status": "success", "deleted_document_id": doc_id},
+                            indent=2,
+                        ),
                     }
                 ]
             }
 
         elif name == "goldpan_kb_audit":
             audit_res = self.chroma.audit_kb()
-            return {"content": [{"type": "text", "text": json.dumps(audit_res, ensure_ascii=False, indent=2)}]}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(audit_res, ensure_ascii=False, indent=2),
+                    }
+                ]
+            }
 
         elif name == "goldpan_doctor":
             diag = collect_doctor_diagnostics(persist_dir=self.chroma.persist_directory)
-            return {"content": [{"type": "text", "text": json.dumps(diag, ensure_ascii=False, indent=2)}]}
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(diag, ensure_ascii=False, indent=2),
+                    }
+                ]
+            }
 
         elif name == "goldpan_ocr":
             source = str(arguments.get("source", "")).strip()
@@ -598,17 +710,86 @@ class GoldPanMCPServer:
                 "source": source,
                 "text": text,
                 "ocr": meta_info,
-                "_meta": build_provenance_meta(FirewallReport(mode="sanitize"), source=source),
+                "_meta": build_provenance_meta(
+                    FirewallReport(mode="sanitize"), source=source
+                ),
             }
             return {
-                "content": [{"type": "text", "text": json.dumps(payload, ensure_ascii=False, indent=2)}],
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(payload, ensure_ascii=False, indent=2),
+                    }
+                ],
                 "_meta": payload["_meta"],
+            }
+
+        elif name == "goldpan_scan_repo":
+            target_path = str(arguments.get("path", ".")).strip()
+            detail = str(arguments.get("detail", "summary")).lower()
+            include = arguments.get("include")
+            exclude = arguments.get("exclude")
+
+            from .scan import CodeScanner
+
+            scanner = CodeScanner(
+                root_dir=target_path,
+                mode="audit",
+                profile="code",
+                include_patterns=include,
+                exclude_patterns=exclude,
+            )
+            report = scanner.scan()
+
+            if detail == "complete":
+                export_path = os.path.abspath("goldpan_scan_complete_report.json")
+                with open(export_path, "w", encoding="utf-8") as f:
+                    f.write(report.to_json())
+                payload = {
+                    "summary": f"Complete scan exported to {export_path}",
+                    "files_scanned": report.files_scanned,
+                    "findings_count": len(report.findings),
+                    "coverage": report.coverage.model_dump(),
+                    "export_file": export_path,
+                }
+            else:
+                top_findings = [f.model_dump() for f in report.findings[:10]]
+                payload = {
+                    "root_path": report.root_path,
+                    "files_scanned": report.files_scanned,
+                    "files_skipped": report.files_skipped,
+                    "is_suspicious": report.is_suspicious,
+                    "highest_risk": report.highest_risk,
+                    "total_findings": len(report.findings),
+                    "top_findings": top_findings,
+                    "clean_files_count": len(report.clean_files),
+                    "suspicious_files_count": len(report.suspicious_files),
+                    "coverage": report.coverage.model_dump(),
+                    "duration_ms": report.duration_ms,
+                }
+
+            prov_meta = {
+                "provenance": {
+                    "untrusted_content": True,
+                    "source": report.root_path,
+                    "tool": "goldpan_scan_repo",
+                    "coverage": report.coverage.model_dump(),
+                }
+            }
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(payload, ensure_ascii=False, indent=2),
+                    }
+                ],
+                "_meta": prov_meta,
             }
 
         else:
             raise ValueError(f"Unknown tool: {name}")
 
-    def handle_request(self, req: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def handle_request(self, req: dict[str, Any]) -> dict[str, Any] | None:
         method = req.get("method")
         req_id = req.get("id")
         params = req.get("params") or {}

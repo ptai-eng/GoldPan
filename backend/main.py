@@ -3,16 +3,12 @@ import re
 import shutil
 import sys
 import uuid
-from typing import Optional
 
 # Fix path to allow importing from backend/goldpan
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from google import genai
-from pydantic import BaseModel
-
 from goldpan.core.exceptions import PromptInjectionBlockedError
 from goldpan.core.pipeline import GoldPanPipeline
 from goldpan.extractors.liteparse_wrapper import LiteParseExtractor
@@ -24,11 +20,13 @@ from goldpan.firewall.context_firewall import build_provenance_meta
 from goldpan.formatters.markdown_formatter import AIFriendlyMarkdownFormatter
 from goldpan.kb.chroma_manager import ChromaManager, compute_document_id
 from goldpan.kb.onnx_embedder import collect_doctor_diagnostics
+from google import genai
+from pydantic import BaseModel
 
 app = FastAPI(
     title="GoldPan AI API",
-    description="Privacy-First Multimodal Data Refinery, Playwright Tier-2 Firewall, Offline Vietnamese OCR, Multilingual E5 ONNX RAG & Agent Context Firewall",
-    version="3.2.0",
+    description="Privacy-First Multimodal Data Refinery, Repo Context Firewall, Offline Vietnamese OCR, Multilingual E5 ONNX RAG & Agent Context Firewall",
+    version="3.3.0",
 )
 
 # Enable CORS for Next.js frontend
@@ -68,12 +66,14 @@ class ChatRequest(BaseModel):
 def get_pipeline(
     source: str,
     is_file: bool = False,
-    api_key: Optional[str] = None,
+    api_key: str | None = None,
     firewall_mode: str = "sanitize",
     enable_ocr: bool = True,
 ) -> GoldPanPipeline:
     if not is_file:
-        extractor = HybridWebExtractor(use_playwright_fallback=True, firewall_mode=firewall_mode)
+        extractor = HybridWebExtractor(
+            use_playwright_fallback=True, firewall_mode=firewall_mode
+        )
     else:
         ext = os.path.splitext(source)[1].lower()
         if ext in [".txt", ".csv", ".json", ".md", ".xml"]:
@@ -93,7 +93,7 @@ def get_pipeline(
 
 
 @app.post("/api/kb/ingest")
-def ingest_document(req: IngestRequest, x_gemini_api_key: Optional[str] = Header(None)):
+def ingest_document(req: IngestRequest, x_gemini_api_key: str | None = Header(None)):
     """
     Ingests cleaned Markdown into the Knowledge Base.
     Works 100% offline using Local ONNX embeddings (`intfloat/multilingual-e5-small`) + SQLite FTS5
@@ -116,10 +116,15 @@ def ingest_document(req: IngestRequest, x_gemini_api_key: Optional[str] = Header
         doc_id = compute_document_id(req.markdown, str(source_name))
         meta["document_id"] = doc_id
 
-        kb_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "KB")
+        kb_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "KB"
+        )
         os.makedirs(kb_dir, exist_ok=True)
 
-        safe_stem = re.sub(r'[\\/*?:"<>|]', "", os.path.basename(str(source_name)))[:50] or "document"
+        safe_stem = (
+            re.sub(r'[\\/*?:"<>|]', "", os.path.basename(str(source_name)))[:50]
+            or "document"
+        )
         safe_filename = f"{safe_stem}_{doc_id[:8]}.md"
         physical_path = os.path.join(kb_dir, safe_filename)
 
@@ -196,7 +201,7 @@ def doctor_diagnostics():
 
 
 @app.post("/api/kb/chat")
-def chat_with_kb(req: ChatRequest, x_gemini_api_key: Optional[str] = Header(None)):
+def chat_with_kb(req: ChatRequest, x_gemini_api_key: str | None = Header(None)):
     if not req.message or not req.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty.")
 
@@ -225,7 +230,10 @@ def chat_with_kb(req: ChatRequest, x_gemini_api_key: Optional[str] = Header(None
         effective_key = x_gemini_api_key
         if not effective_key:
             passages_md = "\n\n".join(
-                [f"**[{i+1}] {h['title']}** (`{h['source']}`):\n> {h['text'][:600]}" for i, h in enumerate(hits)]
+                [
+                    f"**[{i + 1}] {h['title']}** (`{h['source']}`):\n> {h['text'][:600]}"
+                    for i, h in enumerate(hits)
+                ]
             )
             offline_reply = (
                 "### 🔒 Local Offline Retrieval (ONNX `intfloat/multilingual-e5-small` + SQLite FTS5)\n\n"
@@ -241,7 +249,7 @@ def chat_with_kb(req: ChatRequest, x_gemini_api_key: Optional[str] = Header(None
             }
 
         context = "\n\n---\n\n".join(
-            [f"[Source {i+1}: {h['title']}]\n{h['text']}" for i, h in enumerate(hits)]
+            [f"[Source {i + 1}: {h['title']}]\n{h['text']}" for i, h in enumerate(hits)]
         )
 
         history_lines = []
@@ -286,7 +294,7 @@ def chat_with_kb(req: ChatRequest, x_gemini_api_key: Optional[str] = Header(None
 
 
 @app.post("/api/extract/url")
-def extract_url(req: UrlRequest, x_gemini_api_key: Optional[str] = Header(None)):
+def extract_url(req: UrlRequest, x_gemini_api_key: str | None = Header(None)):
     if not req.url or not req.url.strip():
         raise HTTPException(status_code=400, detail="URL is required")
 
@@ -332,8 +340,8 @@ def extract_url(req: UrlRequest, x_gemini_api_key: Optional[str] = Header(None))
 def extract_file(
     file: UploadFile = File(...),
     enable_ocr: bool = Form(True),
-    x_gemini_api_key: Optional[str] = Header(None),
-    x_firewall_mode: Optional[str] = Header("sanitize"),
+    x_gemini_api_key: str | None = Header(None),
+    x_firewall_mode: str | None = Header("sanitize"),
 ):
     if not x_gemini_api_key and file.size and file.size > MAX_OFFLINE_UPLOAD_BYTES:
         raise HTTPException(
@@ -350,7 +358,10 @@ def extract_file(
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        if not x_gemini_api_key and os.path.getsize(file_path) > MAX_OFFLINE_UPLOAD_BYTES:
+        if (
+            not x_gemini_api_key
+            and os.path.getsize(file_path) > MAX_OFFLINE_UPLOAD_BYTES
+        ):
             raise HTTPException(
                 status_code=413,
                 detail="Dung lượng file vượt quá giới hạn 5MB ở chế độ mặc định không khóa API. Vui lòng cấu hình Gemini API Key trong mục Settings để xử lý file lớn.",
@@ -369,7 +380,9 @@ def extract_file(
         clean_title = result.doc_info.title
         if clean_title == os.path.basename(file_path):
             clean_title = safe_basename
-            result.text = result.text.replace(os.path.basename(file_path), safe_basename)
+            result.text = result.text.replace(
+                os.path.basename(file_path), safe_basename
+            )
 
         doc_meta = result.doc_info.metadata or {}
         return {
@@ -456,4 +469,4 @@ def ocr_endpoint(file: UploadFile = File(...)):
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "version": "3.2.0"}
+    return {"status": "ok", "version": "3.3.0"}

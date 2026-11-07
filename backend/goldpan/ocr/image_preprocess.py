@@ -1,13 +1,12 @@
 """Image preprocessing pipeline for offline Vietnamese & document OCR."""
 
 from pathlib import Path
-from typing import Union
 
 import numpy as np
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 
-def load_image(image_input: Union[str, Path, Image.Image]) -> Image.Image:
+def load_image(image_input: str | Path | Image.Image) -> Image.Image:
     """Load image from file path or return existing PIL Image instance in RGB (closing file handles immediately)."""
     if isinstance(image_input, (str, Path)):
         with Image.open(str(image_input)) as raw_img:
@@ -15,7 +14,11 @@ def load_image(image_input: Union[str, Path, Image.Image]) -> Image.Image:
                 transposed = ImageOps.exif_transpose(raw_img)
             except Exception:
                 transposed = raw_img
-            img = transposed.convert("RGB") if transposed.mode not in ("RGB", "L") else transposed.copy()
+            img = (
+                transposed.convert("RGB")
+                if transposed.mode not in ("RGB", "L")
+                else transposed.copy()
+            )
         return img
     elif isinstance(image_input, Image.Image):
         img = image_input
@@ -44,7 +47,9 @@ def sharpen_text(img: Image.Image) -> Image.Image:
     return img.filter(ImageFilter.UnsharpMask(radius=1.5, percent=150, threshold=3))
 
 
-def binarize_adaptive(gray_img: Image.Image, window_size: int = 25, k: float = 0.2) -> Image.Image:
+def binarize_adaptive(
+    gray_img: Image.Image, window_size: int = 25, k: float = 0.2
+) -> Image.Image:
     """
     Vectorized 2D Integral-Image Sauvola adaptive threshold binarization:
         T(x, y) = mean(x, y) * [1 + k * ((std(x, y) / R) - 1)], R = 128.0
@@ -60,11 +65,22 @@ def binarize_adaptive(gray_img: Image.Image, window_size: int = 25, k: float = 0
 
     padded = np.pad(arr, pad_width=pad, mode="reflect")
     # 2D integral images (padded with a leading 0 row/col for 4-corner box lookups)
-    ii = np.pad(np.cumsum(np.cumsum(padded, axis=0), axis=1), ((1, 0), (1, 0)), mode="constant")
-    ii_sq = np.pad(np.cumsum(np.cumsum(padded * padded, axis=0), axis=1), ((1, 0), (1, 0)), mode="constant")
+    ii = np.pad(
+        np.cumsum(np.cumsum(padded, axis=0), axis=1), ((1, 0), (1, 0)), mode="constant"
+    )
+    ii_sq = np.pad(
+        np.cumsum(np.cumsum(padded * padded, axis=0), axis=1),
+        ((1, 0), (1, 0)),
+        mode="constant",
+    )
 
     area = float(win * win)
-    local_sum = ii[win : win + h, win : win + w] - ii[0:h, win : win + w] - ii[win : win + h, 0:w] + ii[0:h, 0:w]
+    local_sum = (
+        ii[win : win + h, win : win + w]
+        - ii[0:h, win : win + w]
+        - ii[win : win + h, 0:w]
+        + ii[0:h, 0:w]
+    )
     local_sq_sum = (
         ii_sq[win : win + h, win : win + w]
         - ii_sq[0:h, win : win + w]
@@ -83,7 +99,7 @@ def binarize_adaptive(gray_img: Image.Image, window_size: int = 25, k: float = 0
 
 
 def preprocess_ocr_image(
-    image_input: Union[str, Path, Image.Image],
+    image_input: str | Path | Image.Image,
     target_dpi: int = 300,
     binarize: bool = False,
 ) -> Image.Image:
@@ -120,7 +136,9 @@ def preprocess_ocr_image(
     return sharpened
 
 
-def detect_text_bands(gray_img: Image.Image, min_line_height: int = 12) -> list[tuple[int, int, int, int]]:
+def detect_text_bands(
+    gray_img: Image.Image, min_line_height: int = 12
+) -> list[tuple[int, int, int, int]]:
     """
     Locates horizontal text line bounding boxes [x0, y0, x1, y1] via horizontal projection profile.
     Useful for layout reconstruction and table cell slicing.

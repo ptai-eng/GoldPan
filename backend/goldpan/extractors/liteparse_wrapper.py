@@ -1,8 +1,9 @@
-import os
-import io
 import csv
+import io
 import json
-from goldpan.core.schemas import RawContent, DocumentInfo
+import os
+
+from goldpan.core.schemas import DocumentInfo, RawContent
 
 
 def _read_text_with_fallback(path: str) -> str:
@@ -16,7 +17,9 @@ def _read_text_with_fallback(path: str) -> str:
 
 
 def _escape_md_cell(cell: str) -> str:
-    cleaned = str(cell).replace("\r\n", "<br>").replace("\n", "<br>").replace("|", "\\|")
+    cleaned = (
+        str(cell).replace("\r\n", "<br>").replace("\n", "<br>").replace("|", "\\|")
+    )
     return cleaned.strip()
 
 
@@ -40,7 +43,9 @@ class LiteParseExtractor:
             reader = csv.reader(io.StringIO(raw_str))
             rows = [r for r in reader if any(cell.strip() for cell in r)]
             if rows:
-                header = [_escape_md_cell(c) or f"Col_{i+1}" for i, c in enumerate(rows[0])]
+                header = [
+                    _escape_md_cell(c) or f"Col_{i + 1}" for i, c in enumerate(rows[0])
+                ]
                 col_count = len(header)
                 table_lines = [
                     f"| {' | '.join(header)} |",

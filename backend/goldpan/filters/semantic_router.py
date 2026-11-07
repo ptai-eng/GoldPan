@@ -1,9 +1,10 @@
-import os
-import re
 import concurrent.futures
+import re
+
 from google import genai
 from google.genai import types
-from goldpan.core.schemas import RawContent, FilteredContent
+
+from goldpan.core.schemas import FilteredContent, RawContent
 
 
 def _split_preserving_fences(text: str) -> list[str]:
@@ -95,7 +96,9 @@ class SemanticRouterFilter:
                 filtered_blocks.append(b)
                 continue
             # Drop short non-punctuated UI fragments (buttons,孤立 menu labels)
-            if len(b_strip) < 30 and not any(char in b_strip for char in [".", "!", "?", ":", ";"]):
+            if len(b_strip) < 30 and not any(
+                char in b_strip for char in [".", "!", "?", ":", ";"]
+            ):
                 noise_removed_bytes += len(b.encode("utf-8"))
                 continue
             filtered_blocks.append(b)
@@ -107,7 +110,9 @@ class SemanticRouterFilter:
 
         return FilteredContent(text=final_text, doc_info=content.doc_info, stats=stats)
 
-    def _group_blocks_into_chunks(self, text: str, max_chunk_chars: int = 15000) -> list[str]:
+    def _group_blocks_into_chunks(
+        self, text: str, max_chunk_chars: int = 15000
+    ) -> list[str]:
         blocks = _split_preserving_fences(text)
         chunks: list[str] = []
         current = ""
@@ -158,8 +163,7 @@ Just output the clean Markdown text."""
                     c_text = c_text[11:]
                 elif c_text.startswith("```"):
                     c_text = c_text[3:]
-                if c_text.endswith("```"):
-                    c_text = c_text[:-3]
+                c_text = c_text.removesuffix("```")
 
                 return idx, c_text.strip()
             except Exception as e:
@@ -167,7 +171,10 @@ Just output the clean Markdown text."""
                 return idx, chunk
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(process_chunk, i, chunk) for i, chunk in enumerate(chunks)]
+            futures = [
+                executor.submit(process_chunk, i, chunk)
+                for i, chunk in enumerate(chunks)
+            ]
             for future in concurrent.futures.as_completed(futures):
                 idx, res = future.result()
                 cleaned_chunks[idx] = res

@@ -4,14 +4,14 @@ import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 from PIL import Image
 
 from ..filters.vn_encoding import normalize_vietnamese_text
 from ..firewall.context_firewall import AgentContextFirewall
 from .image_preprocess import detect_text_bands, preprocess_ocr_image
-from .pdf_scanner import is_scanned_pdf, render_all_pdf_pages, render_pdf_page_to_image
+from .pdf_scanner import is_scanned_pdf, render_all_pdf_pages
 
 
 @dataclass
@@ -86,7 +86,9 @@ class VietnameseOfflineOCR:
         try:
             import pytesseract
 
-            if shutil.which("tesseract") or getattr(pytesseract.pytesseract, "tesseract_cmd", None):
+            if shutil.which("tesseract") or getattr(
+                pytesseract.pytesseract, "tesseract_cmd", None
+            ):
                 return "pytesseract"
         except ImportError:
             pass
@@ -108,7 +110,7 @@ class VietnameseOfflineOCR:
 
     def extract_from_image(
         self,
-        image_input: Union[str, Path, Image.Image],
+        image_input: str | Path | Image.Image,
         page_index: int = 0,
     ) -> PageOCRResult:
         """Run preprocessing and offline OCR on a single image or page."""
@@ -172,7 +174,7 @@ class VietnameseOfflineOCR:
 
     def extract_from_pdf(
         self,
-        file_path: Union[str, Path],
+        file_path: str | Path,
         max_pages: int = 25,
         dpi: int = 200,
     ) -> OCRResult:
@@ -208,7 +210,9 @@ class VietnameseOfflineOCR:
 
         full_md = "\n\n".join(md_sections).strip()
         avg_conf = (
-            round(sum(p.confidence for p in page_results) / max(1, len(page_results)), 3)
+            round(
+                sum(p.confidence for p in page_results) / max(1, len(page_results)), 3
+            )
             if page_results
             else 0.0
         )
@@ -231,11 +235,16 @@ class VietnameseOfflineOCR:
         """
         bands = detect_text_bands(img)
         if not bands:
-            return "[Trang scan không chứa vùng ký tự rõ ràng hoặc độ tương phản thấp]", 0.3
+            return (
+                "[Trang scan không chứa vùng ký tự rõ ràng hoặc độ tương phản thấp]",
+                0.3,
+            )
 
         # Form structured placeholder or extracted glyph lines
         lines: list[str] = []
         for idx, (x0, y0, x1, y1) in enumerate(bands, 1):
             line_h = y1 - y0
-            lines.append(f"[Dòng {idx}: BoundingBox({x0}, {y0}, {x1}, {y1}), height={line_h}px]")
+            lines.append(
+                f"[Dòng {idx}: BoundingBox({x0}, {y0}, {x1}, {y1}), height={line_h}px]"
+            )
         return "\n".join(lines), 0.70

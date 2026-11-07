@@ -286,12 +286,18 @@ def detect_vietnamese_encoding(text: str) -> str:
 
 _VNI_MAP: dict[str, str] = dict(_VNI_SEQUENCES)
 _VNI_TOKEN_RE = re.compile(
-    "|".join(re.escape(k) for k, _ in sorted(_VNI_SEQUENCES, key=lambda x: len(x[0]), reverse=True))
+    "|".join(
+        re.escape(k)
+        for k, _ in sorted(_VNI_SEQUENCES, key=lambda x: len(x[0]), reverse=True)
+    )
 )
 
 _TCVN3_MAP: dict[str, str] = dict(_TCVN3_SEQUENCES)
 _TCVN3_TOKEN_RE = re.compile(
-    "|".join(re.escape(k) for k, _ in sorted(_TCVN3_SEQUENCES, key=lambda x: len(x[0]), reverse=True))
+    "|".join(
+        re.escape(k)
+        for k, _ in sorted(_TCVN3_SEQUENCES, key=lambda x: len(x[0]), reverse=True)
+    )
 )
 
 
@@ -316,7 +322,9 @@ def normalize_vietnamese_text(text: str) -> tuple[str, str]:
         tokens = re.split(r"(\s+)", text)
         converted: list[str] = []
         for tok in tokens:
-            if _VNI_SIGNATURE_RE.search(tok) or any(ch in tok for ch in ("ñ", "Ñ", "ö", "Ö", "ô", "Ô")):
+            if _VNI_SIGNATURE_RE.search(tok) or any(
+                ch in tok for ch in ("ñ", "Ñ", "ö", "Ö", "ô", "Ô")
+            ):
                 converted.append(_convert_vni_word(tok))
             else:
                 converted.append(tok)

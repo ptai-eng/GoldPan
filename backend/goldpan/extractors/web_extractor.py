@@ -65,7 +65,7 @@ class HybridWebExtractor:
             doc_info = DocumentInfo(source_url=url, title=f"YouTube Video - {video_id}")
             return RawContent(text=text, doc_info=doc_info, original_format="youtube")
         except Exception as e:
-            raise ValueError(f"Could not extract YouTube transcript: {str(e)}")
+            raise ValueError(f"Could not extract YouTube transcript: {e!s}")
 
     def extract(self, url: str) -> RawContent:
         url = self._validate_url(url)
@@ -75,7 +75,9 @@ class HybridWebExtractor:
             return self._extract_youtube(url, yt_id)
 
         if "github.com" in url and "/blob/" in url:
-            url = url.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/")
+            url = url.replace("github.com", "raw.githubusercontent.com").replace(
+                "/blob/", "/"
+            )
 
         html = ""
         soup = None
@@ -115,6 +117,7 @@ class HybridWebExtractor:
             fw_report.risk_score = max(fw_report.risk_score, 0.85)
             if self.firewall_mode == "strict":
                 from ..core.exceptions import PromptInjectionBlockedError
+
                 raise PromptInjectionBlockedError(
                     f"Prompt injection blocked by Tier-2 Playwright Computed-Style Firewall: {computed_hidden_stripped} elements hidden via external CSS.",
                     risk_score=fw_report.risk_score,
@@ -127,7 +130,11 @@ class HybridWebExtractor:
         for tag in soup.find_all(["img", "a"]):
             for attr in ("src", "href"):
                 val = tag.get(attr)
-                if isinstance(val, str) and val.startswith("/") and not val.startswith("//"):
+                if (
+                    isinstance(val, str)
+                    and val.startswith("/")
+                    and not val.startswith("//")
+                ):
                     tag[attr] = base_origin + val
         cleaned_html = str(soup)
 
@@ -141,7 +148,9 @@ class HybridWebExtractor:
 
         if not extracted_text:
             extracted_text = (
-                soup.get_text(separator="\n", strip=True) if soup is not None else cleaned_html
+                soup.get_text(separator="\n", strip=True)
+                if soup is not None
+                else cleaned_html
             )
 
         if not extracted_text or not extracted_text.strip():
@@ -185,7 +194,9 @@ class HybridWebExtractor:
                     except Exception:
                         continue
                 if browser is None:
-                    raise RuntimeError("No headless Chromium/Chrome/Edge binary available")
+                    raise RuntimeError(
+                        "No headless Chromium/Chrome/Edge binary available"
+                    )
                 page = browser.new_page(user_agent=DEFAULT_HEADERS["User-Agent"])
                 page.goto(url, wait_until="domcontentloaded", timeout=15000)
 

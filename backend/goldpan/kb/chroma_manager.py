@@ -10,7 +10,7 @@ import uuid
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import chromadb
 
@@ -18,13 +18,16 @@ from ..filters.vn_encoding import fold_vietnamese_diacritics, normalize_vietname
 from ..firewall.context_firewall import AgentContextFirewall
 from .chunker import HierarchicalBreadcrumbChunker
 from .fts_index import SQLiteFTS5Index
-from .onnx_embedder import LegacyMiniLMEmbeddingFunction, MultilingualE5EmbeddingFunction
+from .onnx_embedder import (
+    LegacyMiniLMEmbeddingFunction,
+    MultilingualE5EmbeddingFunction,
+)
 
 GEMINI_EMBEDDING_DIM = 768
 RRF_K = 60
 
 
-def compute_document_id(text: str, source: Optional[str] = None) -> str:
+def compute_document_id(text: str, source: str | None = None) -> str:
     """
     Computes a deterministic, content-addressed UUID5 for idempotent ingestion.
     Normalizes Vietnamese encodings (VNI, TCVN3, NFD -> NFC) so identical texts hash identically.
@@ -72,7 +75,7 @@ def _tokenize_multilingual(text: str) -> list[str]:
     return tokens
 
 
-def _sanitize_metadata(metadata: Optional[dict], document_id: str) -> dict:
+def _sanitize_metadata(metadata: dict | None, document_id: str) -> dict:
     """Ensures all metadata values passed to ChromaDB are non-null primitives (str, int, float, bool)."""
     clean: dict[str, str | int | float | bool] = {"document_id": document_id}
     for k, v in (metadata or {}).items():
@@ -103,15 +106,17 @@ class ChromaManager:
 
     def __init__(
         self,
-        persist_directory: Optional[str] = None,
+        persist_directory: str | None = None,
         prefer_local: bool = False,
-        persist_dir: Optional[str] = None,
+        persist_dir: str | None = None,
         embedding_model: str = "multilingual-e5-small",
-        device_override: Optional[str] = None,
+        device_override: str | None = None,
     ) -> None:
         resolved_dir = persist_directory or persist_dir
         if resolved_dir is None:
-            base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            base_dir = os.path.dirname(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            )
             resolved_dir = os.path.join(base_dir, "chroma_data")
 
         self.persist_directory = str(resolved_dir)
@@ -127,7 +132,7 @@ class ChromaManager:
             self.collection_name = self.COLLECTION_V2_LEGACY
             self.local_ef: Any = LegacyMiniLMEmbeddingFunction()
             self.embedder = self.local_ef
-            self.fts_index: Optional[SQLiteFTS5Index] = None
+            self.fts_index: SQLiteFTS5Index | None = None
             self.local_collection = self.client.get_or_create_collection(
                 name=self.COLLECTION_V2_LEGACY,
                 embedding_function=self.local_ef,
@@ -140,9 +145,13 @@ class ChromaManager:
             )
         else:
             self.collection_name = self.COLLECTION_V3
-            self.local_ef = MultilingualE5EmbeddingFunction(device_override=device_override)
+            self.local_ef = MultilingualE5EmbeddingFunction(
+                device_override=device_override
+            )
             self.embedder = self.local_ef
-            self.fts_index = SQLiteFTS5Index(Path(self.persist_directory) / "goldpan_fts.db")
+            self.fts_index = SQLiteFTS5Index(
+                Path(self.persist_directory) / "goldpan_fts.db"
+            )
             self.local_collection = self.client.get_or_create_collection(
                 name=self.COLLECTION_V3,
                 embedding_function=self.local_ef,
@@ -162,7 +171,7 @@ class ChromaManager:
         except Exception:
             self.legacy_collection = None
 
-        self.api_key: Optional[str] = None
+        self.api_key: str | None = None
         self.prefer_local: bool = prefer_local
 
     @property
@@ -172,21 +181,28 @@ class ChromaManager:
             return self.gemini_collection
         return self.local_collection
 
-    def set_api_key(self, api_key: Optional[str]) -> None:
+    def set_api_key(self, api_key: str | None) -> None:
         self.api_key = api_key.strip() if api_key else None
 
     def check_migration_status(self) -> dict[str, Any]:
         """Check if legacy v2 collection (`goldpan_kb_local`) has documents while v3 is empty."""
         v2_count = 0
         try:
-            existing = [c.name if hasattr(c, "name") else str(c) for c in self.client.list_collections()]
+            existing = [
+                c.name if hasattr(c, "name") else str(c)
+                for c in self.client.list_collections()
+            ]
             if self.COLLECTION_V2_LEGACY in existing:
                 v2_col = self.client.get_collection(self.COLLECTION_V2_LEGACY)
                 v2_count = v2_col.count()
         except Exception:
             v2_count = 0
 
-        v3_count = self.local_collection.count() if self.collection_name == self.COLLECTION_V3 else 0
+        v3_count = (
+            self.local_collection.count()
+            if self.collection_name == self.COLLECTION_V3
+            else 0
+        )
         needs_migration = v2_count > 0 and v3_count == 0
         return {
             "v2_collection": self.COLLECTION_V2_LEGACY,
@@ -236,7 +252,9 @@ class ChromaManager:
                             time.sleep(backoff)
                             backoff *= 2
                             continue
-                    raise ValueError(f"Gemini API Error ({res.status_code}): {error_data}")
+                    raise ValueError(
+                        f"Gemini API Error ({res.status_code}): {error_data}"
+                    )
                 except Exception as e:
                     if attempt == max_retries - 1:
                         raise e
@@ -247,18 +265,25 @@ class ChromaManager:
 
         embeddings: list[Any] = [None] * len(texts)
         with ThreadPoolExecutor(max_workers=4) as executor:
-            future_to_idx = {executor.submit(embed_single, text, i): i for i, text in enumerate(texts)}
+            future_to_idx = {
+                executor.submit(embed_single, text, i): i
+                for i, text in enumerate(texts)
+            }
             for future in as_completed(future_to_idx):
                 idx, emb = future.result()
                 embeddings[idx] = emb
 
         return embeddings
 
-    def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 150) -> list[str]:
+    def _chunk_text(
+        self, text: str, chunk_size: int = 1000, overlap: int = 150
+    ) -> list[str]:
         """Structure-aware hierarchical breadcrumb chunking (v3) or flat paragraph chunking (v2 baseline)."""
         return self.chunk_markdown(text, chunk_size=chunk_size, overlap=overlap)
 
-    def chunk_markdown(self, text: str, chunk_size: int = 1000, overlap: int = 150) -> list[str]:
+    def chunk_markdown(
+        self, text: str, chunk_size: int = 1000, overlap: int = 150
+    ) -> list[str]:
         if not text or not text.strip():
             return []
 
@@ -285,15 +310,17 @@ class ChromaManager:
                 chunks.append(current_chunk)
             return chunks
 
-        custom_chunker = HierarchicalBreadcrumbChunker(chunk_size=chunk_size, overlap=overlap)
+        custom_chunker = HierarchicalBreadcrumbChunker(
+            chunk_size=chunk_size, overlap=overlap
+        )
         items = custom_chunker.chunk_document(text)
         return [item.text for item in items]
 
     def ingest_document(
         self,
-        document_id: Optional[str],
+        document_id: str | None,
         text: str,
-        metadata: Optional[dict] = None,
+        metadata: dict | None = None,
     ) -> str:
         """
         Splits Markdown/Vietnamese text into hierarchical breadcrumb chunks and indexes into
@@ -314,7 +341,9 @@ class ChromaManager:
 
         self.delete_document(document_id)
 
-        chunk_items = self.chunker.chunk_document(norm_text, source_name=str(source_key))
+        chunk_items = self.chunker.chunk_document(
+            norm_text, source_name=str(source_key)
+        )
         if not chunk_items:
             return "none"
 
@@ -333,8 +362,12 @@ class ChromaManager:
 
         if self.api_key and not self.prefer_local:
             try:
-                embeddings = self._get_gemini_embeddings(chunks, output_dimensionality=GEMINI_EMBEDDING_DIM)
-                meta_with_mode = [{**m, "embedding_mode": "gemini_api"} for m in per_chunk_metas]
+                embeddings = self._get_gemini_embeddings(
+                    chunks, output_dimensionality=GEMINI_EMBEDDING_DIM
+                )
+                meta_with_mode = [
+                    {**m, "embedding_mode": "gemini_api"} for m in per_chunk_metas
+                ]
                 self.gemini_collection.upsert(
                     documents=chunks,
                     ids=ids,
@@ -345,16 +378,23 @@ class ChromaManager:
                     fts_metas = [
                         {
                             **m,
-                            "source": m.get("source_url") or m.get("file_path") or m.get("source") or str(source_key),
+                            "source": m.get("source_url")
+                            or m.get("file_path")
+                            or m.get("source")
+                            or str(source_key),
                         }
                         for m in meta_with_mode
                     ]
                     self.fts_index.upsert_chunks(ids, chunks, fts_metas)
                 return "gemini_api"
             except Exception as e:
-                print(f"[ChromaManager] Gemini embedding unavailable ({e}), falling back to Local ONNX.")
+                print(
+                    f"[ChromaManager] Gemini embedding unavailable ({e}), falling back to Local ONNX."
+                )
 
-        meta_with_mode = [{**m, "embedding_mode": "local_onnx"} for m in per_chunk_metas]
+        meta_with_mode = [
+            {**m, "embedding_mode": "local_onnx"} for m in per_chunk_metas
+        ]
         local_embeddings = self.local_ef(chunks)
         self.local_collection.upsert(
             documents=chunks,
@@ -366,7 +406,10 @@ class ChromaManager:
             fts_metas = [
                 {
                     **m,
-                    "source": m.get("source_url") or m.get("file_path") or m.get("source") or str(source_key),
+                    "source": m.get("source_url")
+                    or m.get("file_path")
+                    or m.get("source")
+                    or str(source_key),
                 }
                 for m in meta_with_mode
             ]
@@ -377,7 +420,7 @@ class ChromaManager:
         self,
         text: str,
         source_name: str,
-        extra_metadata: Optional[dict[str, Any]] = None,
+        extra_metadata: dict[str, Any] | None = None,
     ) -> int:
         """Add a document and return the number of chunks indexed."""
         if not text or not text.strip():
@@ -388,8 +431,14 @@ class ChromaManager:
             ids: list[str] = []
             metadatas: list[dict[str, Any]] = []
             for idx, chunk in enumerate(raw_chunks):
-                content_hash = hashlib.md5(f"{source_name}_{idx}_{chunk}".encode("utf-8")).hexdigest()
-                meta: dict[str, Any] = {"source": source_name, "chunk_index": idx, "title": source_name}
+                content_hash = hashlib.md5(
+                    f"{source_name}_{idx}_{chunk}".encode()
+                ).hexdigest()
+                meta: dict[str, Any] = {
+                    "source": source_name,
+                    "chunk_index": idx,
+                    "title": source_name,
+                }
                 if extra_metadata:
                     meta.update(extra_metadata)
                 ids.append(f"doc_{content_hash}")
@@ -403,14 +452,20 @@ class ChromaManager:
             )
             return len(ids)
 
-        meta_in = {"title": source_name, "file_path": source_name, "source": source_name}
+        meta_in = {
+            "title": source_name,
+            "file_path": source_name,
+            "source": source_name,
+        }
         if extra_metadata:
             meta_in.update(extra_metadata)
         doc_id = compute_document_id(text, source_name)
         self.ingest_document(document_id=doc_id, text=text, metadata=meta_in)
         return len(self.chunker.chunk_document(text, source_name=source_name))
 
-    def _compute_bm25_lexical_ranks(self, query: str, pool_chunks: dict[str, dict]) -> list[str]:
+    def _compute_bm25_lexical_ranks(
+        self, query: str, pool_chunks: dict[str, dict]
+    ) -> list[str]:
         """Computes BM25 lexical scores with Vietnamese diacritic folding and compound bigrams over candidate pool."""
         q_tokens = _tokenize_multilingual(query)
         if not q_tokens or not pool_chunks:
@@ -484,14 +539,20 @@ class ChromaManager:
                     metas = (res.get("metadatas") or [[]])[0]
                     dists = (res.get("distances") or [[]])[0]
                 except Exception:
-                    raw = self.local_collection.get(include=["documents", "metadatas", "embeddings"])
+                    raw = self.local_collection.get(
+                        include=["documents", "metadatas", "embeddings"]
+                    )
                     r_ids = raw.get("ids") or []
                     r_docs = raw.get("documents") or []
                     r_metas = raw.get("metadatas") or []
                     r_embs = raw.get("embeddings") or []
                     scored_local = []
-                    for cid_i, doc_i, meta_i, emb_i in zip(r_ids, r_docs, r_metas, r_embs):
-                        d_val = sum((float(a) - float(b)) ** 2 for a, b in zip(q_vec, emb_i))
+                    for cid_i, doc_i, meta_i, emb_i in zip(
+                        r_ids, r_docs, r_metas, r_embs
+                    ):
+                        d_val = sum(
+                            (float(a) - float(b)) ** 2 for a, b in zip(q_vec, emb_i)
+                        )
                         scored_local.append((d_val, cid_i, doc_i, meta_i))
                     scored_local.sort(key=lambda x: x[0])
                     scored_local = scored_local[: min(pool_size, local_cnt)]
@@ -512,7 +573,9 @@ class ChromaManager:
                         or (meta or {}).get("file_path")
                         or (meta or {}).get("source")
                         or "Local KB",
-                        "embedding_mode": (meta or {}).get("embedding_mode", "local_onnx"),
+                        "embedding_mode": (meta or {}).get(
+                            "embedding_mode", "local_onnx"
+                        ),
                         "distance": float(dist) if dist is not None else 1.0,
                         "metadata": meta or {},
                     }
@@ -524,7 +587,9 @@ class ChromaManager:
             try:
                 cnt = self.gemini_collection.count()
                 if cnt > 0:
-                    q_emb = self._get_gemini_embeddings([norm_query], output_dimensionality=GEMINI_EMBEDDING_DIM)
+                    q_emb = self._get_gemini_embeddings(
+                        [norm_query], output_dimensionality=GEMINI_EMBEDDING_DIM
+                    )
                     res = self.gemini_collection.query(
                         query_embeddings=q_emb,
                         n_results=min(pool_size, cnt),
@@ -546,7 +611,9 @@ class ChromaManager:
                             or (meta or {}).get("file_path")
                             or (meta or {}).get("source")
                             or "Local KB",
-                            "embedding_mode": (meta or {}).get("embedding_mode", "gemini_api"),
+                            "embedding_mode": (meta or {}).get(
+                                "embedding_mode", "gemini_api"
+                            ),
                             "distance": float(dist) if dist is not None else 1.0,
                             "metadata": meta or {},
                         }
@@ -588,7 +655,9 @@ class ChromaManager:
             return []
 
         # 4. Also compute in-pool multilingual BM25 ranking (covers Gemini chunks or legacy mode)
-        lexical_rank_order = fts_rank_order or self._compute_bm25_lexical_ranks(norm_query, candidates_by_id)
+        lexical_rank_order = fts_rank_order or self._compute_bm25_lexical_ranks(
+            norm_query, candidates_by_id
+        )
 
         # 5. Fuse rankings via Reciprocal Rank Fusion (RRF, k=60)
         rrf_scores: dict[str, float] = {cid: 0.0 for cid in candidates_by_id}
@@ -686,7 +755,9 @@ class ChromaManager:
             all_data = self.local_collection.get(include=["documents", "metadatas"])
             all_ids: list[str] = all_data.get("ids") or []
             all_docs: list[str] = all_data.get("documents") or []
-            all_metas: list[dict[str, Any]] = all_data.get("metadatas") or [{}] * len(all_docs)
+            all_metas: list[dict[str, Any]] = all_data.get("metadatas") or [{}] * len(
+                all_docs
+            )
 
             tokenized_corpus = [re.findall(r"\w+", doc.lower()) for doc in all_docs]
             tokenized_query = re.findall(r"\w+", query_text.lower())
@@ -708,9 +779,13 @@ class ChromaManager:
                             continue
                         nq = df.get(qw, 0)
                         idf = math.log(1.0 + (N - nq + 0.5) / (nq + 0.5))
-                        sc += idf * ((tf * 2.5) / (tf + 1.5 * (0.25 + 0.75 * (dl / avgdl))))
+                        sc += idf * (
+                            (tf * 2.5) / (tf + 1.5 * (0.25 + 0.75 * (dl / avgdl)))
+                        )
                     raw_scores.append(sc)
-                scored_indices = sorted(range(len(all_ids)), key=lambda i: raw_scores[i], reverse=True)
+                scored_indices = sorted(
+                    range(len(all_ids)), key=lambda i: raw_scores[i], reverse=True
+                )
                 for rank_idx, doc_idx in enumerate(scored_indices[:pool_size]):
                     if raw_scores[doc_idx] > 0:
                         cid = all_ids[doc_idx]
@@ -747,7 +822,8 @@ class ChromaManager:
             {
                 "id": h.get("id", ""),
                 "text": h["text"],
-                "metadata": h.get("metadata") or {"source": h.get("source"), "title": h.get("title")},
+                "metadata": h.get("metadata")
+                or {"source": h.get("source"), "title": h.get("title")},
                 "distance": h.get("distance", 0.5),
                 "bm25_score": h.get("bm25_score", 0.0),
                 "rrf_score": h.get("rrf_score", 0.0),
@@ -758,7 +834,11 @@ class ChromaManager:
     def get_all_documents(self) -> list[dict]:
         """Lists all unique documents across Local ONNX and Gemini collections."""
         docs: dict[str, dict] = {}
-        for col in (self.local_collection, self.gemini_collection, self.legacy_collection):
+        for col in (
+            self.local_collection,
+            self.gemini_collection,
+            self.legacy_collection,
+        ):
             if col is None:
                 continue
             try:
@@ -774,7 +854,9 @@ class ChromaManager:
                                 or meta.get("file_path")
                                 or meta.get("source")
                                 or "Unknown",
-                                "embedding_mode": meta.get("embedding_mode", "local_onnx"),
+                                "embedding_mode": meta.get(
+                                    "embedding_mode", "local_onnx"
+                                ),
                                 "physical_file": meta.get("physical_file"),
                             }
             except Exception:
@@ -784,7 +866,11 @@ class ChromaManager:
     def delete_document(self, document_id: str) -> None:
         """Deletes a document by ID across all Chroma collections and persistent SQLite FTS5."""
         collected_chunk_ids: list[str] = []
-        for col in (self.local_collection, self.gemini_collection, self.legacy_collection):
+        for col in (
+            self.local_collection,
+            self.gemini_collection,
+            self.legacy_collection,
+        ):
             if col is None:
                 continue
             try:
@@ -797,14 +883,18 @@ class ChromaManager:
                 continue
         if self.fts_index is not None:
             try:
-                self.fts_index.delete_chunks(chunk_ids=collected_chunk_ids, document_id=document_id)
+                self.fts_index.delete_chunks(
+                    chunk_ids=collected_chunk_ids, document_id=document_id
+                )
             except Exception:
                 pass
 
     def reindex_from_kb_dir(self, kb_dir: str | Path | None = None) -> dict[str, Any]:
         """Re-index all `.md` files in `KB/` or `kb_data/` into v3 E5 + SQLite FTS5."""
         base_root = Path(__file__).resolve().parents[3]
-        candidate_dirs = [Path(kb_dir)] if kb_dir else [base_root / "KB", base_root / "kb_data"]
+        candidate_dirs = (
+            [Path(kb_dir)] if kb_dir else [base_root / "KB", base_root / "kb_data"]
+        )
 
         self.clear()
         files_indexed = 0
@@ -815,7 +905,9 @@ class ChromaManager:
                 continue
             for md_file in sorted(folder.glob("*.md")):
                 content = md_file.read_text(encoding="utf-8", errors="ignore")
-                body = re.sub(r"^---\n.*?\n---\n*", "", content, flags=re.DOTALL).strip()
+                body = re.sub(
+                    r"^---\n.*?\n---\n*", "", content, flags=re.DOTALL
+                ).strip()
                 if body:
                     added = self.add_document(text=body, source_name=md_file.name)
                     files_indexed += 1

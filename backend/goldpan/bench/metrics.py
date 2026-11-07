@@ -2,11 +2,13 @@
 
 import hashlib
 import math
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 
 
-def wilson_ci_95(successes: int, total: int, z: float = 1.96) -> tuple[float, float, float]:
+def wilson_ci_95(
+    successes: int, total: int, z: float = 1.96
+) -> tuple[float, float, float]:
     """Compute point estimate and 95% Wilson score confidence interval for a binomial proportion.
 
     Returns:
@@ -25,7 +27,9 @@ def wilson_ci_95(successes: int, total: int, z: float = 1.96) -> tuple[float, fl
     return round(p, 4), round(lower, 4), round(upper, 4)
 
 
-def compute_recall_at_k(ranked_doc_ids: Sequence[str], relevant_doc_ids: Sequence[str], k: int = 3) -> float:
+def compute_recall_at_k(
+    ranked_doc_ids: Sequence[str], relevant_doc_ids: Sequence[str], k: int = 3
+) -> float:
     """Compute binary Recall@k (1.0 if at least one relevant doc is in top-k, else 0.0)."""
     if not relevant_doc_ids:
         return 0.0
@@ -34,7 +38,9 @@ def compute_recall_at_k(ranked_doc_ids: Sequence[str], relevant_doc_ids: Sequenc
     return 1.0 if (top_k & rel_set) else 0.0
 
 
-def compute_mrr_at_k(ranked_doc_ids: Sequence[str], relevant_doc_ids: Sequence[str], k: int = 5) -> float:
+def compute_mrr_at_k(
+    ranked_doc_ids: Sequence[str], relevant_doc_ids: Sequence[str], k: int = 5
+) -> float:
     """Compute Reciprocal Rank at k."""
     if not relevant_doc_ids:
         return 0.0

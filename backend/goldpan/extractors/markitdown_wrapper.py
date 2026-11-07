@@ -34,13 +34,26 @@ class GeminiMultimodalConverter(DocumentConverter):
             ext = stream_info.extension.lower()
             if not ext.startswith("."):
                 ext = "." + ext
-            return ext in [".jpg", ".jpeg", ".png", ".webp", ".mp3", ".wav", ".ogg", ".m4a"]
+            return ext in [
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".mp3",
+                ".wav",
+                ".ogg",
+                ".m4a",
+            ]
         return False
 
     def convert(self, file_stream, stream_info, **kwargs) -> DocumentConverterResult:
         self.last_ocr_meta = None
         local_path = getattr(file_stream, "name", None)
-        if not local_path or not isinstance(local_path, str) or not os.path.exists(local_path):
+        if (
+            not local_path
+            or not isinstance(local_path, str)
+            or not os.path.exists(local_path)
+        ):
             raise ValueError("Multimodal converter requires a valid local file path.")
         source_str = str(local_path)
         ext = os.path.splitext(source_str)[1].lower()
@@ -56,14 +69,18 @@ class GeminiMultimodalConverter(DocumentConverter):
                         "lines_count": ocr_page.lines_count,
                         "is_scanned": True,
                     }
-                    if ocr_page.text and not ocr_page.text.startswith("[Trang scan không chứa"):
+                    if ocr_page.text and not ocr_page.text.startswith(
+                        "[Trang scan không chứa"
+                    ):
                         content = (
                             f"# {os.path.basename(source_str)}\n\n"
                             f"{ocr_page.text}\n\n"
                             f"---\n*{exif_summary} | OCR: {ocr_page.backend} (conf={ocr_page.confidence:.2f})*\n"
                         )
                     else:
-                        content = f"# {os.path.basename(source_str)}\n\n{exif_summary}\n"
+                        content = (
+                            f"# {os.path.basename(source_str)}\n\n{exif_summary}\n"
+                        )
                 else:
                     content = f"# {os.path.basename(source_str)}\n\n{exif_summary}\n"
 
@@ -108,7 +125,7 @@ class GeminiMultimodalConverter(DocumentConverter):
                     title=os.path.basename(source_str),
                     text_content=content,
                 )
-            raise ValueError(f"Gemini multimodal processing failed: {str(e)}")
+            raise ValueError(f"Gemini multimodal processing failed: {e!s}")
 
 
 class MarkItDownExtractor:
@@ -223,7 +240,9 @@ class MarkItDownExtractor:
         if self.multimodal_converter.last_ocr_meta is not None:
             fw_meta["ocr"] = self.multimodal_converter.last_ocr_meta
             if "is_scanned" in self.multimodal_converter.last_ocr_meta:
-                fw_meta["is_scanned"] = self.multimodal_converter.last_ocr_meta["is_scanned"]
+                fw_meta["is_scanned"] = self.multimodal_converter.last_ocr_meta[
+                    "is_scanned"
+                ]
 
         doc_info = DocumentInfo(
             file_path=source,
@@ -240,8 +259,8 @@ class MarkItDownExtractor:
     @staticmethod
     def _extract_docx_xml_fallback(source: str) -> str:
         """Pure-Python OOXML paragraph & table extractor for .docx files."""
-        import zipfile
         import xml.etree.ElementTree as ET
+        import zipfile
 
         paragraphs: list[str] = []
         with zipfile.ZipFile(source, "r") as zf:

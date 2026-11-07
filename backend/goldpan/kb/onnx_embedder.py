@@ -198,8 +198,14 @@ _SEMANTIC_CONCEPT_CLUSTERS: list[tuple[str, list[str]]] = [
 
 def select_onnx_providers(device_override: str | None = None) -> ProviderSelection:
     """Select the optimal ONNX Runtime execution provider across Tier 1, Tier 2, and Tier 3."""
-    requested = (device_override or os.environ.get("GOLDPAN_DEVICE", "auto")).strip().lower()
-    available: list[str] = list(ort.get_available_providers()) if ort is not None else ["CPUExecutionProvider"]
+    requested = (
+        (device_override or os.environ.get("GOLDPAN_DEVICE", "auto")).strip().lower()
+    )
+    available: list[str] = (
+        list(ort.get_available_providers())
+        if ort is not None
+        else ["CPUExecutionProvider"]
+    )
 
     def _cpu_tier1(fallback: bool = False, reason: str = "") -> ProviderSelection:
         t0 = time.perf_counter()
@@ -240,11 +246,15 @@ def select_onnx_providers(device_override: str | None = None) -> ProviderSelecti
                 warmup_ms=warmup_ms,
             )
         except Exception as exc:  # pragma: no cover
-            return _cpu_tier1(fallback=True, reason=f"DmlExecutionProvider warmup failed: {exc}")
+            return _cpu_tier1(
+                fallback=True, reason=f"DmlExecutionProvider warmup failed: {exc}"
+            )
 
     # Check Tier 2: Apple Silicon CoreML (macOS M1/M2/M3/M4) - Promoted in v3.1
     if (requested in ("auto", "coreml") and "CoreMLExecutionProvider" in available) or (
-        requested == "auto" and platform.system() == "Darwin" and "CoreMLExecutionProvider" in available
+        requested == "auto"
+        and platform.system() == "Darwin"
+        and "CoreMLExecutionProvider" in available
     ):
         t0 = time.perf_counter()
         try:
@@ -262,7 +272,9 @@ def select_onnx_providers(device_override: str | None = None) -> ProviderSelecti
                 warmup_ms=warmup_ms,
             )
         except Exception as exc:  # pragma: no cover
-            return _cpu_tier1(fallback=True, reason=f"CoreMLExecutionProvider warmup failed: {exc}")
+            return _cpu_tier1(
+                fallback=True, reason=f"CoreMLExecutionProvider warmup failed: {exc}"
+            )
 
     # Check Tier 2: Intel OpenVINO (CPU/iGPU/NPU) - Promoted in v3.1
     if requested in ("auto", "openvino") and "OpenVINOExecutionProvider" in available:
@@ -282,7 +294,9 @@ def select_onnx_providers(device_override: str | None = None) -> ProviderSelecti
                 warmup_ms=warmup_ms,
             )
         except Exception as exc:  # pragma: no cover
-            return _cpu_tier1(fallback=True, reason=f"OpenVINOExecutionProvider warmup failed: {exc}")
+            return _cpu_tier1(
+                fallback=True, reason=f"OpenVINOExecutionProvider warmup failed: {exc}"
+            )
 
     # Check Tier 3: NVIDIA CUDA / ROCm / TensorRT
     if requested in ("auto", "cuda") and "CUDAExecutionProvider" in available:
@@ -325,7 +339,10 @@ class MultilingualE5EmbeddingFunction:
         self.batch_size = self.provider_selection.batch_size
         self.cache_dir = Path(
             cache_dir
-            or os.environ.get("GOLDPAN_MODEL_CACHE", Path.home() / ".cache" / "goldpan" / "models" / "multilingual-e5-small")
+            or os.environ.get(
+                "GOLDPAN_MODEL_CACHE",
+                Path.home() / ".cache" / "goldpan" / "models" / "multilingual-e5-small",
+            )
         )
         self._ort_session: Any = None
         self._tokenizer: Any = None
@@ -349,7 +366,12 @@ class MultilingualE5EmbeddingFunction:
         if ort is None or not self.cache_dir.exists():
             return
         onnx_candidates = [
-            self.cache_dir / ("model_int8.onnx" if self.provider_selection.precision == "INT8" else "model.onnx"),
+            self.cache_dir
+            / (
+                "model_int8.onnx"
+                if self.provider_selection.precision == "INT8"
+                else "model.onnx"
+            ),
             self.cache_dir / "model.onnx",
             self.cache_dir / "model_quantized.onnx",
         ]
@@ -420,7 +442,9 @@ class MultilingualE5EmbeddingFunction:
                     continue
                 except Exception as exc:
                     self.provider_selection.fallback_triggered = True
-                    self.provider_selection.fallback_reason = f"ORT runtime fallback to CPU semantic projection: {exc}"
+                    self.provider_selection.fallback_reason = (
+                        f"ORT runtime fallback to CPU semantic projection: {exc}"
+                    )
                     self.provider_selection.active_provider = "CPUExecutionProvider"
                     self._ort_session = None
             results.extend(self._encode_deterministic_multilingual(batch))
@@ -444,7 +468,9 @@ class MultilingualE5EmbeddingFunction:
         sum_embeddings = np.sum(token_embeddings * mask_expanded, axis=1)
         sum_mask = np.clip(np.sum(mask_expanded, axis=1), a_min=1e-9, a_max=None)
         pooled = sum_embeddings / sum_mask
-        norms = np.clip(np.linalg.norm(pooled, axis=1, keepdims=True), a_min=1e-9, a_max=None)
+        norms = np.clip(
+            np.linalg.norm(pooled, axis=1, keepdims=True), a_min=1e-9, a_max=None
+        )
         normalized = pooled / norms
         return normalized.astype(np.float32).tolist()
 
@@ -465,7 +491,9 @@ class MultilingualE5EmbeddingFunction:
             vec = np.zeros(self.DIMENSION, dtype=np.float32)
 
             # 1. Cross-lingual & Vietnamese legal/technical concept alignment dimensions [0..127]
-            for cluster_idx, (cluster_name, phrases) in enumerate(_SEMANTIC_CONCEPT_CLUSTERS):
+            for cluster_idx, (cluster_name, phrases) in enumerate(
+                _SEMANTIC_CONCEPT_CLUSTERS
+            ):
                 hits = sum(1 for phrase in phrases if phrase in folded_text)
                 if hits > 0:
                     weight = 3.5 * (1.0 + math.log1p(hits))
@@ -488,7 +516,9 @@ class MultilingualE5EmbeddingFunction:
 
                 if idx + 1 < len(tokens):
                     bg = f"{tok}_{tokens[idx + 1]}"
-                    bg_digest = hashlib.blake2b(bg.encode("utf-8"), digest_size=8).digest()
+                    bg_digest = hashlib.blake2b(
+                        bg.encode("utf-8"), digest_size=8
+                    ).digest()
                     bg_dim = 128 + (int.from_bytes(bg_digest[:4], "little") % 192)
                     bg_sign = 1.0 if (bg_digest[4] & 1) == 0 else -1.0
                     vec[bg_dim] += bg_sign * 1.4
@@ -548,7 +578,9 @@ class LegacyMiniLMEmbeddingFunction:
         return (vec / norm).astype(np.float32).tolist()
 
 
-def collect_doctor_diagnostics(persist_dir: str | None = None, device_override: str | None = None) -> dict[str, Any]:
+def collect_doctor_diagnostics(
+    persist_dir: str | None = None, device_override: str | None = None
+) -> dict[str, Any]:
     """Collect hardware, ONNX Runtime, execution provider, SQLite FTS5, and ChromaDB v2/v3 diagnostics."""
     selection = select_onnx_providers(device_override=device_override)
     embedder = MultilingualE5EmbeddingFunction(device_override=device_override)

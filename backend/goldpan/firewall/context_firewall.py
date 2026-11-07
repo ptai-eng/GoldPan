@@ -9,11 +9,15 @@ from typing import Any
 from bs4 import BeautifulSoup, Comment
 
 from ..core.exceptions import PromptInjectionBlockedError
-from ..core.schemas import FirewallReport
+from ..core.schemas import Finding, FirewallReport
 from ..filters.vn_encoding import fold_vietnamese_diacritics
 
 # Unicode Tag block U+E0000..U+E007F (both astral codepoints and UTF-16 surrogate pairs)
 _RE_UNICODE_TAGS = re.compile(r"[\U000e0000-\U000e007f]|(?:\udb40[\udc00-\udc7f])+")
+
+# Legitimate Emoji ZWJ sequences (e.g. 👨‍👩‍👧‍👦, 🏳️‍🌈, 🧑🏽‍💻)
+_EMOJI_PART = r"(?:[\U0001f1e6-\U0001f1ff]|[\U0001f300-\U0001faff]|[\u2600-\u27bf]|[\u2300-\u23ff]|\ufe0f|[\U0001f3fb-\U0001f3ff])"
+_RE_EMOJI_ZWJ_SEQ = re.compile(rf"{_EMOJI_PART}(?:\u200d{_EMOJI_PART})+")
 
 # Bidi overrides and Zero-Width characters
 _RE_BIDI_ZW = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]+")
@@ -100,12 +104,20 @@ class AgentContextFirewall:
     """
 
     VALID_MODES = ("sanitize", "audit", "strict")
+    VALID_PROFILES = ("text", "code")
 
-    def __init__(self, mode: str = "sanitize") -> None:
+    def __init__(self, mode: str = "sanitize", profile: str = "text") -> None:
         normalized_mode = (mode or "sanitize").strip().lower()
         if normalized_mode not in self.VALID_MODES:
-            raise ValueError(f"Invalid firewall mode '{mode}'. Choose from {self.VALID_MODES}.")
+            raise ValueError(
+                f"Invalid firewall mode '{mode}'. Choose from {self.VALID_MODES}."
+            )
         self.mode = normalized_mode
+
+        normalized_profile = (profile or "text").strip().lower()
+        if normalized_profile not in self.VALID_PROFILES:
+            normalized_profile = "text"
+        self.profile = normalized_profile
 
     def process_html(self, html: str) -> tuple[str, FirewallReport]:
         """Inspect and optionally strip hidden DOM/CSS elements and malicious HTML comments before extraction."""
@@ -140,7 +152,10 @@ class AgentContextFirewall:
         for style_tag in soup.find_all("style"):
             css_text = style_tag.get_text() or ""
             for rule_match in re.finditer(r"([^{}]+)\{([^{}]+)\}", css_text):
-                raw_selectors, decls = rule_match.group(1).strip(), rule_match.group(2).strip()
+                raw_selectors, decls = (
+                    rule_match.group(1).strip(),
+                    rule_match.group(2).strip(),
+                )
                 if (
                     _RE_CSS_DISPLAY_NONE.search(decls)
                     or _RE_CSS_VISIBILITY_OPACITY.search(decls)
@@ -149,12 +164,24 @@ class AgentContextFirewall:
                     or _RE_CSS_OFFSCREEN.search(decls)
                 ):
                     for sel in raw_selectors.split(","):
-                        clean_sel = re.sub(r"::?[a-zA-Z-]+(?:\([^)]*\))?", "", sel).strip()
-                        if not clean_sel or clean_sel.startswith("@") or clean_sel.lower() in ("html", "head", "body"):
+                        clean_sel = re.sub(
+                            r"::?[a-zA-Z-]+(?:\([^)]*\))?", "", sel
+                        ).strip()
+                        if (
+                            not clean_sel
+                            or clean_sel.startswith("@")
+                            or clean_sel.lower() in ("html", "head", "body")
+                        ):
                             continue
                         try:
                             for matched_el in list(soup.select(clean_sel)):
-                                if matched_el.name not in ("html", "head", "body", "style", "script"):
+                                if matched_el.name not in (
+                                    "html",
+                                    "head",
+                                    "body",
+                                    "style",
+                                    "script",
+                                ):
                                     if "css_stylesheet_hidden" not in signals:
                                         signals.append("css_stylesheet_hidden")
                                     sanitized_count += 1
@@ -184,7 +211,9 @@ class AgentContextFirewall:
                 matched_sig = "css_display_none"
             elif _RE_CSS_VISIBILITY_OPACITY.search(style):
                 matched_sig = "css_visibility_opacity"
-            elif _RE_CSS_ZERO_FONT.search(style) or _RE_CSS_WHITE_ON_WHITE.search(style):
+            elif _RE_CSS_ZERO_FONT.search(style) or _RE_CSS_WHITE_ON_WHITE.search(
+                style
+            ):
                 matched_sig = "css_zero_font_white"
             elif _RE_CSS_OFFSCREEN.search(style):
                 matched_sig = "css_offscreen_position"
@@ -216,7 +245,9 @@ class AgentContextFirewall:
 
         return cleaned_html, report
 
-    def inspect_pdf_stealth(self, file_path: str | Path) -> tuple[str | None, FirewallReport]:
+    def inspect_pdf_stealth(
+        self, file_path: str | Path
+    ) -> tuple[str | None, FirewallReport]:
         """Inspect PDF character attributes via `pdfplumber` for `<1pt`, white-on-white, or off-page text."""
         signals: list[str] = []
         sanitized_count = 0
@@ -243,8 +274,19 @@ class AgentContextFirewall:
                         top = float(ch.get("top", 0.0) or 0.0)
                         x1 = float(ch.get("x1", 0.0) or 0.0)
 
-                        is_white = color in ((1, 1, 1), (1.0, 1.0, 1.0), [1, 1, 1], [1.0, 1.0, 1.0], 1, 1.0)
-                        is_offpage = x0 < -5.0 or top < -5.0 or (page.width and x1 > float(page.width) + 10.0)
+                        is_white = color in (
+                            (1, 1, 1),
+                            (1.0, 1.0, 1.0),
+                            [1, 1, 1],
+                            [1.0, 1.0, 1.0],
+                            1,
+                            1.0,
+                        )
+                        is_offpage = (
+                            x0 < -5.0
+                            or top < -5.0
+                            or (page.width and x1 > float(page.width) + 10.0)
+                        )
                         if size < 1.0 or is_white or is_offpage:
                             if txt.strip():
                                 sanitized_count += 1
@@ -281,7 +323,9 @@ class AgentContextFirewall:
             )
         return "\n\n".join(visible_pages), report
 
-    def inspect_docx_vanish(self, file_path: str | Path) -> tuple[str | None, FirewallReport]:
+    def inspect_docx_vanish(
+        self, file_path: str | Path
+    ) -> tuple[str | None, FirewallReport]:
         """Inspect DOCX XML (`word/document.xml`) for `<w:vanish/>` hidden text runs."""
         signals: list[str] = []
         sanitized_count = 0
@@ -303,7 +347,9 @@ class AgentContextFirewall:
                     if rpr is not None:
                         vanish_el = rpr.find("w:vanish", ns)
                         if vanish_el is not None:
-                            val = vanish_el.attrib.get(f"{{{ns['w']}}}val", "true").lower()
+                            val = vanish_el.attrib.get(
+                                f"{{{ns['w']}}}val", "true"
+                            ).lower()
                             if val not in ("false", "0", "off"):
                                 is_vanish = True
 
@@ -374,19 +420,36 @@ class AgentContextFirewall:
             if self.mode == "sanitize":
                 out = _RE_UNICODE_TAGS.sub("", out)
 
-        # 2. Unicode Bidi overrides & Zero-Width steganography
-        bidi_matches = _RE_BIDI_ZW.findall(out)
+        # 2. Unicode Bidi overrides & Zero-Width steganography (preserving legitimate Emoji ZWJ sequences)
+        emoji_zwj_spans = [m.span() for m in _RE_EMOJI_ZWJ_SEQ.finditer(out)]
+
+        def _in_emoji_zwj(start_pos: int, end_pos: int) -> bool:
+            return any(es <= start_pos and end_pos <= ee for es, ee in emoji_zwj_spans)
+
+        bidi_matches = [
+            m
+            for m in _RE_BIDI_ZW.finditer(out)
+            if not _in_emoji_zwj(m.start(), m.end())
+        ]
         if bidi_matches:
             if "unicode_bidi_zero_width" not in signals:
                 signals.append("unicode_bidi_zero_width")
             sanitized_count += len(bidi_matches)
             risk_score = max(risk_score, 0.8)
             if self.mode == "sanitize":
-                out = _RE_BIDI_ZW.sub("", out)
+                chars = list(out)
+                for m in reversed(bidi_matches):
+                    chars[m.start() : m.end()] = []
+                out = "".join(chars)
 
-        # 3. Fake ChatML / Llama / System delimiters (ignoring inline code documentation examples like `<|im_start|>`)
-        out_without_inline_code = re.sub(r"`[^`\n]{1,40}`", "", out)
-        if _RE_FAKE_CHAT_TOKENS.search(out_without_inline_code):
+        # 3. Fake ChatML / Llama / System delimiters (ignoring code blocks/inline code documentation examples like `<|im_start|>`)
+        if self.profile == "code":
+            out_for_tokens = re.sub(r"(?s)(```|~~~).*?(?:\1|$)", "", out)
+            out_for_tokens = re.sub(r"`[^`\n]{1,80}`", "", out_for_tokens)
+        else:
+            out_for_tokens = re.sub(r"`[^`\n]{1,40}`", "", out)
+
+        if _RE_FAKE_CHAT_TOKENS.search(out_for_tokens):
             if "fake_chat_delimiter" not in signals:
                 signals.append("fake_chat_delimiter")
             sanitized_count += 1
@@ -408,19 +471,22 @@ class AgentContextFirewall:
             sanitized_count += len(exfil_matches)
             risk_score = max(risk_score, 0.9)
             if self.mode == "sanitize":
-                out = _RE_MD_EXFIL_BEACON.sub(r"[Blocked External Image Beacon: \1]", out)
+                out = _RE_MD_EXFIL_BEACON.sub(
+                    r"[Blocked External Image Beacon: \1]", out
+                )
 
         # 5. Semantic Instruction-Override Scoring (English & Vietnamese)
         # First check if the document is a benign academic/OWASP hard negative discussing prompt injection
         is_academic_discussion = bool(_RE_ACADEMIC_CONTEXT.search(out))
 
         if not is_academic_discussion:
-            if _RE_SEMANTIC_EN.search(out):
+            text_for_semantic = out_for_tokens if self.profile == "code" else out
+            if _RE_SEMANTIC_EN.search(text_for_semantic):
                 if "semantic_override_en" not in signals:
                     signals.append("semantic_override_en")
                 risk_score = max(risk_score, 0.85)
 
-            folded_out = fold_vietnamese_diacritics(out)
+            folded_out = fold_vietnamese_diacritics(text_for_semantic)
             if _RE_SEMANTIC_VI_FOLDED.search(folded_out):
                 if "semantic_override_vi" not in signals:
                     signals.append("semantic_override_vi")
@@ -445,8 +511,157 @@ class AgentContextFirewall:
 
         return out, report
 
+    def scan_text_findings(self, text: str, filename: str = "") -> list[Finding]:
+        """Scan source code or document text for prompt injection findings with exact line & column coordinates."""
+        findings: list[Finding] = []
+        if not text:
+            return findings
 
-def build_provenance_meta(report: FirewallReport | None, source: str = "") -> dict[str, Any]:
+        fn_lower = filename.lower().replace("\\", "/")
+        is_test_or_bench = any(
+            k in fn_lower
+            for k in (
+                "test",
+                "tests/",
+                "bench",
+                "benchmark",
+                "threat_model",
+                "threatmodel",
+                "firewall",
+            )
+        )
+
+        def _make_finding(
+            start_pos: int, signal: str, severity: str, risk: float
+        ) -> Finding:
+            line_no = text[:start_pos].count("\n") + 1
+            last_nl = text.rfind("\n", 0, start_pos)
+            col_no = start_pos + 1 if last_nl == -1 else start_pos - last_nl
+            line_start = last_nl + 1 if last_nl != -1 else 0
+            next_nl = text.find("\n", start_pos)
+            line_end = next_nl if next_nl != -1 else len(text)
+            snippet = text[line_start:line_end].strip()[:120]
+            return Finding(
+                path=filename,
+                line=line_no,
+                column=col_no,
+                signal=signal,
+                severity=severity,
+                risk_score=risk,
+                snippet=snippet,
+            )
+
+        fence_spans = [m.span() for m in re.finditer(r"(?s)(```|~~~).*?(?:\1|$)", text)]
+        inline_spans = [m.span() for m in re.finditer(r"`[^`\n]{1,80}`", text)]
+
+        def _in_spans(pos: int, spans: list[tuple[int, int]]) -> bool:
+            return any(s <= pos < e for s, e in spans)
+
+        # 1. Unicode Tags (suspicious unless in test/bench fixtures in code profile)
+        for m in _RE_UNICODE_TAGS.finditer(text):
+            sev = (
+                "info"
+                if (self.profile == "code" and is_test_or_bench)
+                else "suspicious"
+            )
+            risk = 0.10 if sev == "info" else 0.95
+            findings.append(_make_finding(m.start(), "unicode_tags_e0000", sev, risk))
+
+        # 2. Unicode Bidi & Zero-Width (ignoring legitimate emoji ZWJ sequences)
+        emoji_zwj_spans = [m.span() for m in _RE_EMOJI_ZWJ_SEQ.finditer(text)]
+
+        def _in_emoji_zwj(start_pos: int, end_pos: int) -> bool:
+            return any(es <= start_pos and end_pos <= ee for es, ee in emoji_zwj_spans)
+
+        for m in _RE_BIDI_ZW.finditer(text):
+            if not _in_emoji_zwj(m.start(), m.end()):
+                sev = (
+                    "info"
+                    if (self.profile == "code" and is_test_or_bench)
+                    else "suspicious"
+                )
+                risk = 0.10 if sev == "info" else 0.85
+                findings.append(
+                    _make_finding(m.start(), "unicode_bidi_zero_width", sev, risk)
+                )
+
+        # 3. Markdown exfiltration beacons
+        for m in _RE_MD_EXFIL_BEACON.finditer(text):
+            pos = m.start()
+            in_fence = _in_spans(pos, fence_spans)
+            in_inline = _in_spans(pos, inline_spans)
+            if self.profile == "code" and (in_fence or in_inline or is_test_or_bench):
+                findings.append(
+                    _make_finding(pos, "markdown_exfil_beacon", "info", 0.10)
+                )
+            else:
+                findings.append(
+                    _make_finding(pos, "markdown_exfil_beacon", "suspicious", 0.90)
+                )
+
+        # 4. Fake chat delimiters
+        for m in _RE_FAKE_CHAT_TOKENS.finditer(text):
+            pos = m.start()
+            in_fence = _in_spans(pos, fence_spans)
+            in_inline = _in_spans(pos, inline_spans)
+            if self.profile == "code":
+                if in_fence or in_inline or is_test_or_bench:
+                    findings.append(
+                        _make_finding(pos, "fake_chat_delimiter", "info", 0.10)
+                    )
+                else:
+                    findings.append(
+                        _make_finding(pos, "fake_chat_delimiter", "suspicious", 0.90)
+                    )
+            else:
+                if in_inline:
+                    findings.append(
+                        _make_finding(pos, "fake_chat_delimiter", "info", 0.10)
+                    )
+                else:
+                    findings.append(
+                        _make_finding(pos, "fake_chat_delimiter", "suspicious", 0.90)
+                    )
+
+        # 5. Semantic override (English and Vietnamese in markdown/text files)
+        ext = Path(filename).suffix.lower() if filename else ""
+        if ext in (".md", ".txt", ".rst") and not is_test_or_bench:
+            if not _RE_ACADEMIC_CONTEXT.search(text):
+                for m in _RE_SEMANTIC_EN.finditer(text):
+                    pos = m.start()
+                    if not _in_spans(pos, fence_spans) and not _in_spans(
+                        pos, inline_spans
+                    ):
+                        findings.append(
+                            _make_finding(
+                                pos,
+                                "semantic_override_en",
+                                "suspicious",
+                                0.85,
+                            )
+                        )
+
+                folded_text = fold_vietnamese_diacritics(text)
+                for m in _RE_SEMANTIC_VI_FOLDED.finditer(folded_text):
+                    pos = m.start()
+                    if not _in_spans(pos, fence_spans) and not _in_spans(
+                        pos, inline_spans
+                    ):
+                        findings.append(
+                            _make_finding(
+                                pos,
+                                "semantic_override_vi",
+                                "suspicious",
+                                0.85,
+                            )
+                        )
+
+        return findings
+
+
+def build_provenance_meta(
+    report: FirewallReport | None, source: str = ""
+) -> dict[str, Any]:
     """Construct the standardized `_meta.provenance` object for MCP responses and API schemas."""
     fw_data = (
         report.model_dump()

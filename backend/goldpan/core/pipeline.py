@@ -1,4 +1,4 @@
-from typing import List, Optional, Protocol
+from typing import Protocol
 
 from .exceptions import (
     ExtractionError,
@@ -24,8 +24,8 @@ class Formatter(Protocol):
 class GoldPanPipeline:
     def __init__(self, extractor: Extractor) -> None:
         self.extractor = extractor
-        self.filters: List[Filter] = []
-        self.formatter: Optional[Formatter] = None
+        self.filters: list[Filter] = []
+        self.formatter: Formatter | None = None
 
     def add_filter(self, filter_layer: Filter) -> None:
         self.filters.append(filter_layer)
@@ -40,7 +40,7 @@ class GoldPanPipeline:
         except PromptInjectionBlockedError:
             raise
         except Exception as e:
-            raise ExtractionError(f"Failed to extract from {source}: {str(e)}")
+            raise ExtractionError(f"Failed to extract from {source}: {e!s}")
 
         # Step 2: Filters
         for i, filter_layer in enumerate(self.filters):
@@ -50,7 +50,7 @@ class GoldPanPipeline:
                 raise
             except Exception as e:
                 raise FilterError(
-                    f"Failed at filter layer {i} ({filter_layer.__class__.__name__}): {str(e)}"
+                    f"Failed at filter layer {i} ({filter_layer.__class__.__name__}): {e!s}"
                 )
 
         # Step 3: Format
@@ -62,4 +62,4 @@ class GoldPanPipeline:
         except PromptInjectionBlockedError:
             raise
         except Exception as e:
-            raise FormattingError(f"Failed to format output: {str(e)}")
+            raise FormattingError(f"Failed to format output: {e!s}")

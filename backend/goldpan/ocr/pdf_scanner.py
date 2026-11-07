@@ -1,7 +1,6 @@
 """Scanned PDF detector and high-speed page rasterizer using pypdfium2 / pdfplumber."""
 
 from pathlib import Path
-from typing import Union
 
 from PIL import Image
 
@@ -17,7 +16,7 @@ except ImportError:
 
 
 def is_scanned_pdf(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     char_threshold_per_page: int = 35,
     max_pages_to_sample: int = 5,
 ) -> tuple[bool, list[int], int]:
@@ -42,7 +41,11 @@ def is_scanned_pdf(
         try:
             with pdfplumber.open(path_str) as pdf:
                 total_pages = len(pdf.pages)
-                sample_count = min(total_pages, max_pages_to_sample) if max_pages_to_sample > 0 else total_pages
+                sample_count = (
+                    min(total_pages, max_pages_to_sample)
+                    if max_pages_to_sample > 0
+                    else total_pages
+                )
                 for idx in range(sample_count):
                     page = pdf.pages[idx]
                     txt = page.extract_text() or ""
@@ -67,7 +70,11 @@ def is_scanned_pdf(
         try:
             with pdfium.PdfDocument(path_str) as pdf:
                 total_pages = len(pdf)
-                sample_count = min(total_pages, max_pages_to_sample) if max_pages_to_sample > 0 else total_pages
+                sample_count = (
+                    min(total_pages, max_pages_to_sample)
+                    if max_pages_to_sample > 0
+                    else total_pages
+                )
                 for idx in range(sample_count):
                     page = pdf[idx]
                     textpage = page.get_textpage()
@@ -91,7 +98,7 @@ def is_scanned_pdf(
 
 
 def render_pdf_page_to_image(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     page_index: int = 0,
     dpi: int = 200,
 ) -> Image.Image:
@@ -109,7 +116,9 @@ def render_pdf_page_to_image(
         try:
             with pdfium.PdfDocument(path_str) as pdf:
                 if page_index < 0 or page_index >= len(pdf):
-                    raise IndexError(f"Page index {page_index} out of range for PDF with {len(pdf)} pages.")
+                    raise IndexError(
+                        f"Page index {page_index} out of range for PDF with {len(pdf)} pages."
+                    )
                 page = pdf[page_index]
                 pil_image = page.render(scale=scale).to_pil()
                 try:
@@ -124,18 +133,24 @@ def render_pdf_page_to_image(
         try:
             with pdfplumber.open(path_str) as pdf:
                 if page_index < 0 or page_index >= len(pdf.pages):
-                    raise IndexError(f"Page index {page_index} out of range for PDF with {len(pdf.pages)} pages.")
+                    raise IndexError(
+                        f"Page index {page_index} out of range for PDF with {len(pdf.pages)} pages."
+                    )
                 page = pdf.pages[page_index]
                 page_img = page.to_image(resolution=dpi)
                 return page_img.original
         except Exception as exc:
-            raise RuntimeError(f"Failed to render PDF page {page_index} using pdfplumber: {exc}")
+            raise RuntimeError(
+                f"Failed to render PDF page {page_index} using pdfplumber: {exc}"
+            )
 
-    raise RuntimeError("Neither pypdfium2 nor pdfplumber is available to render PDF pages.")
+    raise RuntimeError(
+        "Neither pypdfium2 nor pdfplumber is available to render PDF pages."
+    )
 
 
 def render_all_pdf_pages(
-    file_path: Union[str, Path],
+    file_path: str | Path,
     max_pages: int = 20,
     dpi: int = 200,
 ) -> list[tuple[int, Image.Image]]:

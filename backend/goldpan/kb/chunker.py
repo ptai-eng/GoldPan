@@ -6,7 +6,9 @@ from typing import Any
 
 from ..filters.vn_encoding import normalize_vietnamese_text
 
-_RE_PHAN = re.compile(r"^\s*(Phần\s+(?:thứ\s+[\wÀ-ỹ]+|[IVXLCDM0-9]+)\s*[:.\-]?\s*.*)$", re.IGNORECASE)
+_RE_PHAN = re.compile(
+    r"^\s*(Phần\s+(?:thứ\s+[\wÀ-ỹ]+|[IVXLCDM0-9]+)\s*[:.\-]?\s*.*)$", re.IGNORECASE
+)
 _RE_CHUONG = re.compile(r"^\s*(Chương\s+[IVXLCDM0-9]+\s*[:.\-]?\s*.*)$", re.IGNORECASE)
 _RE_MUC = re.compile(r"^\s*(Mục\s+[0-9IVXLCDM]+\s*[:.\-]?\s*.*)$", re.IGNORECASE)
 _RE_DIEU = re.compile(r"^\s*(Điều\s+\d+[a-zA-Z]?\s*[:.\-]?\s*.*)$", re.IGNORECASE)
@@ -166,7 +168,9 @@ class HierarchicalBreadcrumbChunker:
                 flush_section()
                 dieu_text = m_dieu.group(1).strip()
                 hierarchy["dieu"] = dieu_text
-                m_dieu_id = re.match(r"^(Điều\s+\d+[a-zA-Z]?)", dieu_text, re.IGNORECASE)
+                m_dieu_id = re.match(
+                    r"^(Điều\s+\d+[a-zA-Z]?)", dieu_text, re.IGNORECASE
+                )
                 current_dieu = m_dieu_id.group(1) if m_dieu_id else dieu_text
                 current_breadcrumb = self._format_breadcrumb(hierarchy)
                 current_lines.append(stripped)

@@ -1,5 +1,6 @@
 import re
-from goldpan.core.schemas import RawContent, FilteredContent
+
+from goldpan.core.schemas import FilteredContent, RawContent
 
 
 class HeuristicFilter:
@@ -15,7 +16,9 @@ class HeuristicFilter:
             re.compile(r"(?i)\bcookie policy\b"),
             re.compile(r"(?i)\bsubscribe to (?:our )?newsletter\b"),
             re.compile(r"(?i)\ball rights reserved\b"),
-            re.compile(r"(?i)^\s*(?:accept all cookies|manage cookies|privacy preferences)\s*$"),
+            re.compile(
+                r"(?i)^\s*(?:accept all cookies|manage cookies|privacy preferences)\s*$"
+            ),
         ]
         # Non-greedy standalone navigation link on its own line: [Label](url)
         self.standalone_link_pattern = re.compile(
@@ -55,7 +58,9 @@ class HeuristicFilter:
                 if self.standalone_link_pattern.match(line):
                     noise_removed_bytes += len(line.encode("utf-8"))
                     continue
-                if len(stripped) <= 80 and any(p.search(stripped) for p in self.short_line_noise_patterns):
+                if len(stripped) <= 80 and any(
+                    p.search(stripped) for p in self.short_line_noise_patterns
+                ):
                     noise_removed_bytes += len(line.encode("utf-8"))
                     continue
 

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -10,15 +10,27 @@ class FirewallReport(BaseModel):
     risk_score: float = 0.0
     is_suspicious: bool = False
     sanitized_count: int = 0
-    signals: List[str] = Field(default_factory=list)
+    signals: list[str] = Field(default_factory=list)
     untrusted_content: bool = True
 
 
+class Finding(BaseModel):
+    """An individual security finding detected during repo scanning."""
+
+    path: str
+    line: int = 1
+    column: int = 1
+    signal: str
+    severity: str = "suspicious"  # "suspicious" | "info"
+    risk_score: float = 0.0
+    snippet: str = ""
+
+
 class DocumentInfo(BaseModel):
-    source_url: Optional[str] = None
-    file_path: Optional[str] = None
-    title: Optional[str] = None
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    source_url: str | None = None
+    file_path: str | None = None
+    title: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class RawContent(BaseModel):
@@ -34,7 +46,7 @@ class FilteredContent(BaseModel):
 
     text: str
     doc_info: DocumentInfo
-    stats: Dict[str, Any] = Field(default_factory=dict)
+    stats: dict[str, Any] = Field(default_factory=dict)
 
 
 class FinalMarkdown(BaseModel):
@@ -42,5 +54,5 @@ class FinalMarkdown(BaseModel):
 
     text: str
     doc_info: DocumentInfo
-    stats: Dict[str, Any] = Field(default_factory=dict)
-    firewall: Optional[FirewallReport] = None
+    stats: dict[str, Any] = Field(default_factory=dict)
+    firewall: FirewallReport | None = None

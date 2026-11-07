@@ -18,10 +18,8 @@ BACKEND_DIR = os.path.join(ROOT_DIR, "backend")
 if BACKEND_DIR not in sys.path:
     sys.path.insert(0, BACKEND_DIR)
 
-from fastapi.testclient import TestClient
-from typer.testing import CliRunner
-
 import main as backend_main
+from fastapi.testclient import TestClient
 from goldpan.bench.runner import GoldPanBenchRunner
 from goldpan.cli import app as cli_app
 from goldpan.core.exceptions import ExtractionError, PromptInjectionBlockedError
@@ -34,15 +32,23 @@ from goldpan.filters.heuristic_filter import HeuristicFilter
 from goldpan.filters.semantic_router import SemanticRouterFilter
 from goldpan.filters.vn_encoding import (
     detect_vietnamese_encoding,
-    fold_vietnamese_diacritics,
     normalize_vietnamese_text,
 )
-from goldpan.firewall.context_firewall import AgentContextFirewall, spotlight_untrusted_content
+from goldpan.firewall.context_firewall import (
+    AgentContextFirewall,
+)
 from goldpan.formatters.markdown_formatter import AIFriendlyMarkdownFormatter
-from goldpan.kb.chroma_manager import GEMINI_EMBEDDING_DIM, ChromaManager, compute_document_id
-from goldpan.kb.chunker import HierarchicalBreadcrumbChunker, extract_legal_metadata
-from goldpan.kb.onnx_embedder import MultilingualE5EmbeddingFunction, collect_doctor_diagnostics
+from goldpan.kb.chroma_manager import (
+    GEMINI_EMBEDDING_DIM,
+    ChromaManager,
+    compute_document_id,
+)
+from goldpan.kb.chunker import HierarchicalBreadcrumbChunker
+from goldpan.kb.onnx_embedder import (
+    MultilingualE5EmbeddingFunction,
+)
 from goldpan.mcp_server import GoldPanMCPServer
+from typer.testing import CliRunner
 
 
 def test_web_extractor():
@@ -101,7 +107,9 @@ def test_liteparse_extractor():
     print("=== [3/14] Testing LiteParse Extractor (CSV -> Markdown Table) ===")
     test_file = os.path.join(ROOT_DIR, "test_table_tmp.csv")
     with open(test_file, "w", encoding="utf-8") as f:
-        f.write("Model,Dimension,Mode\nintfloat/multilingual-e5-small,384,Local ONNX\ngemini-embedding-001,768,Cloud API\n")
+        f.write(
+            "Model,Dimension,Mode\nintfloat/multilingual-e5-small,384,Local ONNX\ngemini-embedding-001,768,Cloud API\n"
+        )
 
     try:
         extractor = LiteParseExtractor()
@@ -120,7 +128,9 @@ def test_liteparse_extractor():
 
 
 def test_local_onnx_kb():
-    print("=== [4/14] Testing Dual-Mode ChromaManager v3 (100% Offline Multilingual E5 ONNX + SQLite FTS5) ===")
+    print(
+        "=== [4/14] Testing Dual-Mode ChromaManager v3 (100% Offline Multilingual E5 ONNX + SQLite FTS5) ==="
+    )
     tmp_dir = tempfile.mkdtemp(prefix="goldpan_kb_test_")
     try:
         kb = ChromaManager(persist_directory=tmp_dir, prefer_local=True)
@@ -128,7 +138,11 @@ def test_local_onnx_kb():
         mode = kb.ingest_document(
             document_id="doc-001",
             text="# GoldPan Architecture\n\nGoldPan uses ChromaDB with local ONNX intfloat/multilingual-e5-small embeddings and SQLite FTS5 for offline privacy-first vector retrieval.",
-            metadata={"title": "GoldPan Architecture Spec", "file_path": "architecture.md", "source_url": None},
+            metadata={
+                "title": "GoldPan Architecture Spec",
+                "file_path": "architecture.md",
+                "source_url": None,
+            },
         )
         assert mode == "local_onnx", f"Expected local_onnx mode, got {mode}"
         assert kb.fts_index is not None and kb.fts_index.count() >= 1
@@ -136,7 +150,9 @@ def test_local_onnx_kb():
         docs = kb.get_all_documents()
         assert len(docs) == 1 and docs[0]["id"] == "doc-001"
 
-        hits = kb.search_with_citations("What embedding model does GoldPan use offline?", n_results=1)
+        hits = kb.search_with_citations(
+            "What embedding model does GoldPan use offline?", n_results=1
+        )
         assert len(hits) == 1
         assert "multilingual-e5-small" in hits[0]["text"]
         assert hits[0]["embedding_mode"] == "local_onnx"
@@ -144,29 +160,42 @@ def test_local_onnx_kb():
 
         kb.delete_document("doc-001")
         assert len(kb.get_all_documents()) == 0
-        print("[PASS] Local E5 ONNX + SQLite FTS5 Knowledge Base (Ingest -> Hybrid RRF Search -> Delete) verified\n")
+        print(
+            "[PASS] Local E5 ONNX + SQLite FTS5 Knowledge Base (Ingest -> Hybrid RRF Search -> Delete) verified\n"
+        )
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def test_mcp_server_contracts():
-    print("=== [5/14] Testing GoldPan MCP Server v3.0 (JSON-RPC 2.0 + Firewall Provenance + Spotlighting) ===")
+    print(
+        "=== [5/14] Testing GoldPan MCP Server v3.0 (JSON-RPC 2.0 + Firewall Provenance + Spotlighting) ==="
+    )
     tmp_chroma = tempfile.mkdtemp(prefix="goldpan_mcp_chroma_")
     tmp_kb = tempfile.mkdtemp(prefix="goldpan_mcp_kb_")
     sample_md = os.path.join(tmp_kb, "sample_input.md")
     with open(sample_md, "w", encoding="utf-8") as f:
-        f.write("# GoldPan MCP Test\n\n" + ("Pure signal extracted for MCP agent consumption. " * 25))
+        f.write(
+            "# GoldPan MCP Test\n\n"
+            + ("Pure signal extracted for MCP agent consumption. " * 25)
+        )
 
     try:
-        server = GoldPanMCPServer(persist_directory=tmp_chroma, kb_dir=tmp_kb, api_key="")
+        server = GoldPanMCPServer(
+            persist_directory=tmp_chroma, kb_dir=tmp_kb, api_key=""
+        )
 
         # 1. initialize
-        init_res = server.handle_request({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+        init_res = server.handle_request(
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
+        )
         assert init_res["result"]["serverInfo"]["name"] == "goldpan-mcp"
-        assert init_res["result"]["serverInfo"]["version"] == "3.2.0"
+        assert init_res["result"]["serverInfo"]["version"] == "3.3.0"
 
         # 2. tools/list
-        tools_res = server.handle_request({"jsonrpc": "2.0", "id": 2, "method": "tools/list"})
+        tools_res = server.handle_request(
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"}
+        )
         tool_names = {t["name"] for t in tools_res["result"]["tools"]}
         assert {
             "goldpan_extract",
@@ -177,6 +206,7 @@ def test_mcp_server_contracts():
             "goldpan_kb_audit",
             "goldpan_doctor",
             "goldpan_ocr",
+            "goldpan_scan_repo",
         }.issubset(tool_names)
 
         # 3. tools/call -> goldpan_extract with summary truncation, spotlighting & firewall provenance
@@ -214,7 +244,11 @@ def test_mcp_server_contracts():
                 "method": "tools/call",
                 "params": {
                     "name": "goldpan_kb_search",
-                    "arguments": {"query": "MCP agent consumption", "n_results": 2, "detail": "summary"},
+                    "arguments": {
+                        "query": "MCP agent consumption",
+                        "n_results": 2,
+                        "detail": "summary",
+                    },
                 },
             }
         )
@@ -226,20 +260,32 @@ def test_mcp_server_contracts():
         assert "coverage" in search_payload
 
         # 5. resources/list & resources/read
-        res_list = server.handle_request({"jsonrpc": "2.0", "id": 5, "method": "resources/list"})
+        res_list = server.handle_request(
+            {"jsonrpc": "2.0", "id": 5, "method": "resources/list"}
+        )
         uris = [r["uri"] for r in res_list["result"]["resources"]]
         target_uri = f"goldpan://kb/{doc_id}"
         assert target_uri in uris
 
         res_read = server.handle_request(
-            {"jsonrpc": "2.0", "id": 6, "method": "resources/read", "params": {"uri": target_uri}}
+            {
+                "jsonrpc": "2.0",
+                "id": 6,
+                "method": "resources/read",
+                "params": {"uri": target_uri},
+            }
         )
         assert "Pure signal extracted" in res_read["result"]["contents"][0]["text"]
         assert res_read["result"]["_meta"]["provenance"]["untrusted_content"] is True
 
         # 6. tools/call -> goldpan_kb_audit & goldpan_doctor
         aud_res = server.handle_request(
-            {"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": "goldpan_kb_audit", "arguments": {}}}
+            {
+                "jsonrpc": "2.0",
+                "id": 7,
+                "method": "tools/call",
+                "params": {"name": "goldpan_kb_audit", "arguments": {}},
+            }
         )
         assert json.loads(aud_res["result"]["content"][0]["text"])["status"] == "clean"
 
@@ -249,30 +295,53 @@ def test_mcp_server_contracts():
                 "jsonrpc": "2.0",
                 "id": 8,
                 "method": "tools/call",
-                "params": {"name": "goldpan_kb_delete", "arguments": {"document_id": doc_id}},
+                "params": {
+                    "name": "goldpan_kb_delete",
+                    "arguments": {"document_id": doc_id},
+                },
             }
         )
         list_after = server.handle_request(
-            {"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": "goldpan_kb_list", "arguments": {}}}
+            {
+                "jsonrpc": "2.0",
+                "id": 9,
+                "method": "tools/call",
+                "params": {"name": "goldpan_kb_list", "arguments": {}},
+            }
         )
-        assert json.loads(list_after["result"]["content"][0]["text"])["total_documents"] == 0
-        print("[PASS] GoldPan MCP Server v3.0 (initialize, tools, resources, firewall provenance & spotlighting) verified\n")
+        assert (
+            json.loads(list_after["result"]["content"][0]["text"])["total_documents"]
+            == 0
+        )
+        print(
+            "[PASS] GoldPan MCP Server v3.0 (initialize, tools, resources, firewall provenance & spotlighting) verified\n"
+        )
     finally:
         shutil.rmtree(tmp_chroma, ignore_errors=True)
         shutil.rmtree(tmp_kb, ignore_errors=True)
 
 
 def test_cli_commands():
-    print("=== [6/16] Testing GoldPan CLI v3.2 (version, extract, doctor, ocr) ===")
+    print("=== [6/17] Testing GoldPan CLI v3.3 (version, extract, doctor, ocr) ===")
     runner = CliRunner()
     ver_res = runner.invoke(cli_app, ["version"])
     assert ver_res.exit_code == 0
-    assert "GoldPan AI v3.2.0" in ver_res.stdout
+    assert "GoldPan AI v3.3.0" in ver_res.stdout
 
     sample_file = os.path.join(ROOT_DIR, "README.md")
     ext_res = runner.invoke(
         cli_app,
-        ["extract", sample_file, "--detail", "summary", "--max-chars", "250", "--firewall-mode", "sanitize", "--json"],
+        [
+            "extract",
+            sample_file,
+            "--detail",
+            "summary",
+            "--max-chars",
+            "250",
+            "--firewall-mode",
+            "sanitize",
+            "--json",
+        ],
     )
     assert ext_res.exit_code == 0
     data = json.loads(ext_res.stdout)
@@ -285,11 +354,15 @@ def test_cli_commands():
     doc_data = json.loads(doc_res.stdout)
     assert doc_data["embedding_dimension"] == 384
     assert "active_provider" in doc_data
-    print("[PASS] GoldPan CLI v3.0 (`version`, `extract --json`, `doctor --json`) verified\n")
+    print(
+        "[PASS] GoldPan CLI v3.0 (`version`, `extract --json`, `doctor --json`) verified\n"
+    )
 
 
 def test_algorithmic_edge_cases_and_mutations():
-    print("=== [7/14] Testing Algorithmic Edge Cases & Mutation Guards (rea-ci-tests-audit) ===")
+    print(
+        "=== [7/14] Testing Algorithmic Edge Cases & Mutation Guards (rea-ci-tests-audit) ==="
+    )
     raw_md = (
         "#Architecture Overview\n\n"
         "[Home](https://example.com/nav)\n"
@@ -310,7 +383,11 @@ def test_algorithmic_edge_cases_and_mutations():
         "- Bullet item two\n\n"
         "Sign Up Now\n"
     )
-    raw = RawContent(text=raw_md, doc_info=DocumentInfo(title="Architecture Overview"), original_format="md")
+    raw = RawContent(
+        text=raw_md,
+        doc_info=DocumentInfo(title="Architecture Overview"),
+        original_format="md",
+    )
     h_filtered = HeuristicFilter().apply(raw)
     s_filtered = SemanticRouterFilter(use_api=False).apply(h_filtered)
     final_md = AIFriendlyMarkdownFormatter().format(s_filtered)
@@ -321,7 +398,9 @@ def test_algorithmic_edge_cases_and_mutations():
     assert "\nCookie policy\n" not in final_md.text
     assert "Sign Up Now" not in final_md.text
     assert "[1] Vaswani et al. (2017)" in final_md.text
-    assert "[Attention Is All You Need](https://arxiv.org/abs/1706.03762)" in final_md.text
+    assert (
+        "[Attention Is All You Need](https://arxiv.org/abs/1706.03762)" in final_md.text
+    )
     assert "analyzing how a cookie policy interacts with GDPR" in final_md.text
     assert "#!/usr/bin/env python3" in final_md.text
     assert "#include_guard" in final_md.text
@@ -349,10 +428,18 @@ def test_algorithmic_edge_cases_and_mutations():
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
     web_ext = HybridWebExtractor(use_playwright_fallback=False)
-    assert web_ext._extract_youtube_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == "dQw4w9WgXcQ"
-    assert web_ext._extract_youtube_id("https://youtu.be/dQw4w9WgXcQ?t=10") == "dQw4w9WgXcQ"
+    assert (
+        web_ext._extract_youtube_id("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        == "dQw4w9WgXcQ"
+    )
+    assert (
+        web_ext._extract_youtube_id("https://youtu.be/dQw4w9WgXcQ?t=10")
+        == "dQw4w9WgXcQ"
+    )
     assert web_ext._extract_youtube_id("https://youtu.be/") is None
-    assert web_ext._extract_youtube_id("https://example.com/watch?v=dQw4w9WgXcQ") is None
+    assert (
+        web_ext._extract_youtube_id("https://example.com/watch?v=dQw4w9WgXcQ") is None
+    )
     with pytest.raises(ValueError):
         web_ext.extract("http://169.254.169.254/latest/meta-data/")
     with pytest.raises(ValueError):
@@ -362,7 +449,9 @@ def test_algorithmic_edge_cases_and_mutations():
 
 
 def test_gemini_768d_and_rrf_fusion():
-    print("=== [8/14] Testing Gemini 768d MRL Embeddings, 429 Retry & Cross-Collection RRF Fusion ===")
+    print(
+        "=== [8/14] Testing Gemini 768d MRL Embeddings, 429 Retry & Cross-Collection RRF Fusion ==="
+    )
     tmp_dir = tempfile.mkdtemp(prefix="goldpan_rrf_test_")
     try:
         kb = ChromaManager(persist_directory=tmp_dir, prefer_local=False)
@@ -394,7 +483,10 @@ def test_gemini_768d_and_rrf_fusion():
             resp.json.return_value = {"embedding": {"values": raw_vec}}
             return resp
 
-        with patch("requests.post", side_effect=fake_post), patch("time.sleep", return_value=None):
+        with (
+            patch("requests.post", side_effect=fake_post),
+            patch("time.sleep", return_value=None),
+        ):
             mode = kb.ingest_document(
                 document_id="doc-cloud",
                 text="# Cloud Engine\n\nGoldPan supports Gemini 768d Matryoshka embeddings with RRF fusion.",
@@ -409,20 +501,26 @@ def test_gemini_768d_and_rrf_fusion():
             l2_norm = math.sqrt(sum(float(v) * float(v) for v in vec))
             assert math.isclose(l2_norm, 1.0, rel_tol=1e-4)
 
-            hits = kb.search_with_citations("Gemini 768d Matryoshka embeddings", n_results=2)
+            hits = kb.search_with_citations(
+                "Gemini 768d Matryoshka embeddings", n_results=2
+            )
             assert len(hits) == 2
             modes_returned = {h["embedding_mode"] for h in hits}
             assert modes_returned == {"local_onnx", "gemini_api"}
             assert hits[0]["title"] == "Cloud Engine Spec"
             assert hits[0]["rrf_score"] > hits[1]["rrf_score"]
 
-        print("[PASS] Gemini 768d MRL outputDimensionality, L2 Norm, 429 Backoff & RRF Fusion verified\n")
+        print(
+            "[PASS] Gemini 768d MRL outputDimensionality, L2 Norm, 429 Backoff & RRF Fusion verified\n"
+        )
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def test_idempotent_ingest_and_vietnamese_retrieval():
-    print("=== [9/14] Testing Content-Hash Deduplication & Vietnamese NFD/Diacritic Retrieval ===")
+    print(
+        "=== [9/14] Testing Content-Hash Deduplication & Vietnamese NFD/Diacritic Retrieval ==="
+    )
     tmp_dir = tempfile.mkdtemp(prefix="goldpan_vi_test_")
     try:
         kb = ChromaManager(persist_directory=tmp_dir, prefer_local=True)
@@ -434,18 +532,26 @@ def test_idempotent_ingest_and_vietnamese_retrieval():
             "và thời gian phản hồi của thuật toán.",
         )
         doc_id_1 = compute_document_id(vn_text_nfd, "tinhdiem_bantochuc.md")
-        doc_id_2 = compute_document_id(unicodedata.normalize("NFC", vn_text_nfd), "tinhdiem_bantochuc.md")
+        doc_id_2 = compute_document_id(
+            unicodedata.normalize("NFC", vn_text_nfd), "tinhdiem_bantochuc.md"
+        )
         assert doc_id_1 == doc_id_2
 
         kb.ingest_document(
             document_id="auto",
             text=vn_text_nfd,
-            metadata={"title": "Quy chế tính điểm", "file_path": "tinhdiem_bantochuc.md"},
+            metadata={
+                "title": "Quy chế tính điểm",
+                "file_path": "tinhdiem_bantochuc.md",
+            },
         )
         kb.ingest_document(
             document_id="auto",
             text=vn_text_nfd,
-            metadata={"title": "Quy chế tính điểm", "file_path": "tinhdiem_bantochuc.md"},
+            metadata={
+                "title": "Quy chế tính điểm",
+                "file_path": "tinhdiem_bantochuc.md",
+            },
         )
         assert len(kb.get_all_documents()) == 1
 
@@ -455,22 +561,32 @@ def test_idempotent_ingest_and_vietnamese_retrieval():
             metadata={"title": "Docker Guide", "file_path": "docker.md"},
         )
 
-        hits_accented = kb.search_with_citations("cách tính điểm của ban tổ chức", n_results=2)
+        hits_accented = kb.search_with_citations(
+            "cách tính điểm của ban tổ chức", n_results=2
+        )
         assert hits_accented[0]["title"] == "Quy chế tính điểm"
 
-        hits_unaccented = kb.search_with_citations("quy che tinh diem ban to chuc", n_results=2)
+        hits_unaccented = kb.search_with_citations(
+            "quy che tinh diem ban to chuc", n_results=2
+        )
         assert hits_unaccented[0]["title"] == "Quy chế tính điểm"
 
-        print("[PASS] Content-Hash Deduplication & Vietnamese (NFC/NFD + Unaccented) Retrieval verified\n")
+        print(
+            "[PASS] Content-Hash Deduplication & Vietnamese (NFC/NFD + Unaccented) Retrieval verified\n"
+        )
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 def test_fastapi_endpoints_and_security():
-    print("=== [10/14] Testing FastAPI Endpoints, Path Traversal & Idempotent KB Ingest ===")
+    print(
+        "=== [10/14] Testing FastAPI Endpoints, Path Traversal & Idempotent KB Ingest ==="
+    )
     tmp_chroma = tempfile.mkdtemp(prefix="goldpan_api_chroma_")
     orig_chroma = backend_main.chroma_manager
-    backend_main.chroma_manager = ChromaManager(persist_directory=tmp_chroma, prefer_local=True)
+    backend_main.chroma_manager = ChromaManager(
+        persist_directory=tmp_chroma, prefer_local=True
+    )
     client = TestClient(backend_main.app)
 
     try:
@@ -501,7 +617,10 @@ def test_fastapi_endpoints_and_security():
 
         chat_res = client.post(
             "/api/kb/chat",
-            json={"message": "What vector dimension does GoldPan enforce?", "history": []},
+            json={
+                "message": "What vector dimension does GoldPan enforce?",
+                "history": [],
+            },
         )
         assert chat_res.status_code == 200
         chat_data = chat_res.json()
@@ -512,14 +631,18 @@ def test_fastapi_endpoints_and_security():
         assert del_res.status_code == 200
         docs_after = client.get("/api/kb/documents").json()["documents"]
         assert len(docs_after) == 0
-        print("[PASS] FastAPI Endpoints, Path Traversal Guard & Idempotent KB Ingest verified\n")
+        print(
+            "[PASS] FastAPI Endpoints, Path Traversal Guard & Idempotent KB Ingest verified\n"
+        )
     finally:
         backend_main.chroma_manager = orig_chroma
         shutil.rmtree(tmp_chroma, ignore_errors=True)
 
 
 def test_pillar_b_vietnamese_encodings_and_breadcrumb_chunker():
-    print("=== [11/14] Testing Pillar B: VNI-Windows, TCVN3 (ABC), Legal Metadata & Breadcrumb Chunker ===")
+    print(
+        "=== [11/14] Testing Pillar B: VNI-Windows, TCVN3 (ABC), Legal Metadata & Breadcrumb Chunker ==="
+    )
     vni_sample = (
         "Boä Luaät Lao Ñoäng Số: 45/2019/QH14\n"
         "Ngày 20 tháng 11 năm 2019\n"
@@ -552,11 +675,15 @@ def test_pillar_b_vietnamese_encodings_and_breadcrumb_chunker():
     assert dieu35_chunk.metadata.get("so_hieu") == "45/2019/QH14"
     assert dieu35_chunk.metadata.get("ngay_ban_hanh") == "2019-11-20"
     assert dieu35_chunk.metadata.get("loai_van_ban") == "BỘ LUẬT"
-    print("[PASS] Pillar B VNI/TCVN3 decoding, Breadcrumb Chunker & Legal Metadata verified\n")
+    print(
+        "[PASS] Pillar B VNI/TCVN3 decoding, Breadcrumb Chunker & Legal Metadata verified\n"
+    )
 
 
 def test_pillar_b_e5_prefixes_and_migration():
-    print("=== [12/14] Testing Pillar B: E5 Prefixing, 3-Tier Provider Selection & v2->v3 Migration ===")
+    print(
+        "=== [12/14] Testing Pillar B: E5 Prefixing, 3-Tier Provider Selection & v2->v3 Migration ==="
+    )
     embedder = MultilingualE5EmbeddingFunction(device_override="cpu")
     assert embedder.provider_selection.active_provider == "CPUExecutionProvider"
     assert embedder.format_passage("Hello") == "passage: Hello"
@@ -569,21 +696,29 @@ def test_pillar_b_e5_prefixes_and_migration():
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
         # Create legacy v2 collection with 1 doc
-        kb_v2 = ChromaManager(persist_directory=tmp_dir, embedding_model="all-MiniLM-L6-v2")
+        kb_v2 = ChromaManager(
+            persist_directory=tmp_dir, embedding_model="all-MiniLM-L6-v2"
+        )
         kb_v2.add_document("Legacy v2 document content", source_name="legacy.md")
         assert kb_v2.count() == 1
 
         # Initialize v3 ChromaManager on same directory -> must isolate into goldpan_kb_e5_v3 and report migration needed
-        kb_v3 = ChromaManager(persist_directory=tmp_dir, embedding_model="multilingual-e5-small")
+        kb_v3 = ChromaManager(
+            persist_directory=tmp_dir, embedding_model="multilingual-e5-small"
+        )
         mig = kb_v3.check_migration_status()
         assert mig["v2_chunks"] == 1
         assert mig["v3_chunks"] == 0
         assert mig["needs_migration"] is True
-    print("[PASS] Pillar B E5 Prefixing, 3-Tier Provider Selection & v2->v3 Migration Detection verified\n")
+    print(
+        "[PASS] Pillar B E5 Prefixing, 3-Tier Provider Selection & v2->v3 Migration Detection verified\n"
+    )
 
 
 def test_pillar_a_agent_context_firewall():
-    print("=== [13/14] Testing Pillar A: Agent Context Firewall (sanitize, audit, strict & Hard Negatives) ===")
+    print(
+        "=== [13/14] Testing Pillar A: Agent Context Firewall (sanitize, audit, strict & Hard Negatives) ==="
+    )
     fw_sanitize = AgentContextFirewall(mode="sanitize")
 
     # 1. Hidden DOM/CSS + HTML comment injection
@@ -631,7 +766,9 @@ def test_pillar_a_agent_context_firewall():
     with pytest.raises(PromptInjectionBlockedError):
         fw_strict.process_html(malicious_html)
 
-    print("[PASS] Pillar A Agent Context Firewall (sanitize, audit, strict & Hard Negative 0% FPR) verified\n")
+    print(
+        "[PASS] Pillar A Agent Context Firewall (sanitize, audit, strict & Hard Negative 0% FPR) verified\n"
+    )
 
 
 def test_pillar_c_goldpan_bench_and_ci_gate():
@@ -646,9 +783,11 @@ def test_pillar_c_goldpan_bench_and_ci_gate():
     v2_r3 = tb["v2_1_minilm_rrf"]["recall_at_3"]
     bm25_r3 = tb["bm25_only"]["recall_at_3"]
 
-    print(f"  Track B Recall@3 -> BM25-only: {bm25_r3*100:.1f}% | v2.1 MiniLM: {v2_r3*100:.1f}% | v3.0 E5+FTS5: {v3_r3*100:.1f}%")
     print(
-        f"  Track A Firewall -> TPR: {ta['detection_tpr']*100:.1f}% | Sanitization: {ta['sanitization_rate']*100:.1f}% | Hard-Neg FPR: {ta['hard_negative_fpr']*100:.1f}%"
+        f"  Track B Recall@3 -> BM25-only: {bm25_r3 * 100:.1f}% | v2.1 MiniLM: {v2_r3 * 100:.1f}% | v3.0 E5+FTS5: {v3_r3 * 100:.1f}%"
+    )
+    print(
+        f"  Track A Firewall -> TPR: {ta['detection_tpr'] * 100:.1f}% | Sanitization: {ta['sanitization_rate'] * 100:.1f}% | Hard-Neg FPR: {ta['hard_negative_fpr'] * 100:.1f}%"
     )
 
     assert v3_r3 >= 0.90, f"Expected v3.0 Recall@3 >= 90%, got {v3_r3}"
@@ -660,18 +799,26 @@ def test_pillar_c_goldpan_bench_and_ci_gate():
 
     cli_runner = CliRunner()
     out_md = Path(ROOT_DIR) / "BENCHMARK_REPORT.md"
-    bench_cli = cli_runner.invoke(cli_app, ["bench", "--ci-gate", "--output-md", str(out_md)])
-    assert bench_cli.exit_code == 0, f"goldpan bench --ci-gate failed: {bench_cli.stdout}"
+    bench_cli = cli_runner.invoke(
+        cli_app, ["bench", "--ci-gate", "--output-md", str(out_md)]
+    )
+    assert bench_cli.exit_code == 0, (
+        f"goldpan bench --ci-gate failed: {bench_cli.stdout}"
+    )
     assert out_md.exists()
-    print("[PASS] Pillar C GoldPan Bench & `--ci-gate` verified (BENCHMARK_REPORT.md generated)\n")
+    print(
+        "[PASS] Pillar C GoldPan Bench & `--ci-gate` verified (BENCHMARK_REPORT.md generated)\n"
+    )
 
 
 def test_v3_1_offline_ocr_and_tier2_hardware():
-    print("=== [15/16] Testing GoldPan v3.1: Offline Vietnamese OCR & Tier 2 Apple Silicon / OpenVINO ===")
-    from PIL import Image, ImageDraw
+    print(
+        "=== [15/16] Testing GoldPan v3.1: Offline Vietnamese OCR & Tier 2 Apple Silicon / OpenVINO ==="
+    )
+    from goldpan.kb.onnx_embedder import select_onnx_providers
     from goldpan.ocr.engine import VietnameseOfflineOCR
     from goldpan.ocr.pdf_scanner import is_scanned_pdf, render_pdf_page_to_image
-    from goldpan.kb.onnx_embedder import select_onnx_providers
+    from PIL import Image, ImageDraw
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         img_path = os.path.join(tmpdir, "test_scan.png")
@@ -695,7 +842,9 @@ def test_v3_1_offline_ocr_and_tier2_hardware():
             assert isinstance(page_img, Image.Image)
 
         server = GoldPanMCPServer()
-        mcp_res = server.call_tool("goldpan_ocr", {"source": img_path, "spotlight": True})
+        mcp_res = server.call_tool(
+            "goldpan_ocr", {"source": img_path, "spotlight": True}
+        )
         assert "content" in mcp_res
         mcp_data = json.loads(mcp_res["content"][0]["text"])
         assert "ocr" in mcp_data
@@ -707,22 +856,32 @@ def test_v3_1_offline_ocr_and_tier2_hardware():
         cli_data = json.loads(cli_res.stdout)
         assert "ocr" in cli_data
 
-        with patch("onnxruntime.get_available_providers", return_value=["CoreMLExecutionProvider", "CPUExecutionProvider"]):
+        with patch(
+            "onnxruntime.get_available_providers",
+            return_value=["CoreMLExecutionProvider", "CPUExecutionProvider"],
+        ):
             with patch("platform.system", return_value="Darwin"):
                 coreml_sel = select_onnx_providers("auto")
                 assert "CoreML" in coreml_sel.tier
                 assert coreml_sel.active_provider == "CoreMLExecutionProvider"
 
-        with patch("onnxruntime.get_available_providers", return_value=["OpenVINOExecutionProvider", "CPUExecutionProvider"]):
+        with patch(
+            "onnxruntime.get_available_providers",
+            return_value=["OpenVINOExecutionProvider", "CPUExecutionProvider"],
+        ):
             openvino_sel = select_onnx_providers("openvino")
             assert "OpenVINO" in openvino_sel.tier
             assert openvino_sel.active_provider == "OpenVINOExecutionProvider"
 
-    print("[PASS] GoldPan v3.1 Offline OCR, MCP goldpan_ocr, CLI ocr, & Tier 2 Hardware verified\n")
+    print(
+        "[PASS] GoldPan v3.1 Offline OCR, MCP goldpan_ocr, CLI ocr, & Tier 2 Hardware verified\n"
+    )
 
 
 def test_v3_2_playwright_tier2_firewall_and_templates():
-    print("=== [16/16] Testing GoldPan v3.2: Playwright Tier-2 Computed-Style DOM Firewall & Contributor CI ===")
+    print(
+        "=== [16/16] Testing GoldPan v3.2: Playwright Tier-2 Computed-Style DOM Firewall & Contributor CI ==="
+    )
     from goldpan.extractors.web_extractor import HybridWebExtractor
 
     with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
@@ -753,7 +912,9 @@ def test_v3_2_playwright_tier2_firewall_and_templates():
         pw_html, stripped_count = extractor._extract_with_playwright(file_url)
 
         assert pw_html is not None
-        assert stripped_count >= 3, f"Expected at least 3 computed hidden elements stripped, got {stripped_count}"
+        assert stripped_count >= 3, (
+            f"Expected at least 3 computed hidden elements stripped, got {stripped_count}"
+        )
         assert "IGNORE ALL PREVIOUS INSTRUCTIONS" not in pw_html
         assert "STEALTH SYSTEM PROMPT INJECTION" not in pw_html
         assert "OFFSCREEN PROMPT HIJACKING" not in pw_html
@@ -762,7 +923,9 @@ def test_v3_2_playwright_tier2_firewall_and_templates():
         # Verify pure <style> block parsing in AgentContextFirewall.process_html (offline / no browser)
         with open(html_file, "r", encoding="utf-8") as f:
             raw_html_str = f.read()
-        clean_static, rep_static = AgentContextFirewall(mode="sanitize").process_html(raw_html_str)
+        clean_static, rep_static = AgentContextFirewall(mode="sanitize").process_html(
+            raw_html_str
+        )
         assert rep_static.is_suspicious is True
         assert rep_static.sanitized_count >= 3
         assert "IGNORE ALL PREVIOUS INSTRUCTIONS" not in clean_static
@@ -772,17 +935,23 @@ def test_v3_2_playwright_tier2_firewall_and_templates():
 
         # Verify Sauvola 2D Integral-Image Adaptive Binarization on uneven lighting with text strokes
         import numpy as np
-        from PIL import Image
         from goldpan.ocr.image_preprocess import binarize_adaptive
+        from PIL import Image
 
         gradient = np.tile(np.linspace(90, 240, 120, dtype=np.uint8), (60, 1))
         # Draw thin dark text strokes (3px thick) across both shadowed left side and bright right side
         gradient[28:31, 15:105] = 20
-        bin_img = binarize_adaptive(Image.fromarray(gradient, mode="L"), window_size=15, k=0.2)
+        bin_img = binarize_adaptive(
+            Image.fromarray(gradient, mode="L"), window_size=15, k=0.2
+        )
         bin_arr = np.asarray(bin_img)
         assert set(np.unique(bin_arr)).issubset({0, 255})
-        assert np.mean(bin_arr[28:31, 20:100]) == 0  # Stroke is cleanly binarized to black (0) across shadow & bright zones
-        assert np.mean(bin_arr[5:15, 10:110]) == 255  # Background is cleanly binarized to white (255) across gradient
+        assert (
+            np.mean(bin_arr[28:31, 20:100]) == 0
+        )  # Stroke is cleanly binarized to black (0) across shadow & bright zones
+        assert (
+            np.mean(bin_arr[5:15, 10:110]) == 255
+        )  # Background is cleanly binarized to white (255) across gradient
 
         # Verify FTS5 chunk cleanup on document deletion (zero ghost BM25 hits)
         kb_del_dir = os.path.join(tmpdir, "kb_fts_del")
@@ -807,9 +976,43 @@ def test_v3_2_playwright_tier2_firewall_and_templates():
     client = TestClient(backend_main.app)
     h_res = client.get("/health")
     assert h_res.status_code == 200
-    assert h_res.json()["version"] == "3.2.0"
+    assert h_res.json()["version"] == "3.3.0"
 
-    print("[PASS] GoldPan v3.2 Playwright Tier-2 Firewall & Contributor CI Templates verified\n")
+    print(
+        "[PASS] GoldPan v3.2 Playwright Tier-2 Firewall & Contributor CI Templates verified\n"
+    )
+
+
+def test_v3_3_repo_context_firewall_and_scan():
+    print(
+        "=== [17/17] Testing GoldPan v3.3: Repo Context Firewall (goldpan scan, SARIF, Track C) ==="
+    )
+    from goldpan.bench.runner import GoldPanBenchRunner
+    from goldpan.scan import CodeScanner
+
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp_dir:
+        root = Path(tmp_dir)
+        (root / "clean.py").write_text("import os\nprint('safe')\n", encoding="utf-8")
+        (root / "evil.py").write_text("# \u202e evil bidi\n", encoding="utf-8")
+
+        scanner = CodeScanner(root_dir=root, mode="audit", profile="code")
+        report = scanner.scan()
+        assert report.files_scanned == 2
+        assert len(report.suspicious_files) == 1
+        assert "evil.py" in report.suspicious_files[0]
+        assert "clean.py" in report.clean_files[0]
+
+        sarif_obj = report.to_sarif()
+        assert sarif_obj["version"] == "2.1.0"
+        assert len(sarif_obj["runs"][0]["results"]) >= 1
+
+    # Verify Track C benchmark runner
+    runner = GoldPanBenchRunner()
+    tc = runner.run_track_c()
+    assert tc["detection_tpr"] >= 0.95
+    assert tc["hard_negative_fpr"] == 0.0
+
+    print("[PASS] GoldPan v3.3 Repo Context Firewall & Track C Benchmark verified\n")
 
 
 if __name__ == "__main__":
@@ -829,4 +1032,7 @@ if __name__ == "__main__":
     test_pillar_c_goldpan_bench_and_ci_gate()
     test_v3_1_offline_ocr_and_tier2_hardware()
     test_v3_2_playwright_tier2_firewall_and_templates()
-    print("All 16 GoldPan v3.2 verification, security, OCR & Playwright suites passed!")
+    test_v3_3_repo_context_firewall_and_scan()
+    print(
+        "All 17 GoldPan v3.3 verification, security, OCR, Playwright & Repo Firewall suites passed!"
+    )

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "goldpan"
-version = "3.2.0"
-description = "Privacy-First Multimodal Data Refinery, Playwright Tier-2 Firewall, Offline Vietnamese OCR, Multilingual E5 ONNX + SQLite FTS5 RAG & MCP Server"
+version = "3.3.0"
+description = "Privacy-First Multimodal Data Refinery, Repo Context Firewall, Offline Vietnamese OCR, Multilingual E5 ONNX + SQLite FTS5 RAG & MCP Server"
 readme = "README.md"
 license = { file = "LICENSE" }
 authors = [
@@ -32,6 +32,7 @@ dependencies = [
     "requests>=2.32.0",
     "typer>=0.12.0",
     "rich>=13.0.0",
+    "pathspec>=0.12.0",
 ]
 
 [project.optional-dependencies]

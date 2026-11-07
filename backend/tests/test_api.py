@@ -18,7 +18,7 @@ def test_health_endpoint():
     assert res.status_code == 200
     data = res.json()
     assert data["status"] == "ok"
-    assert data["version"] == "3.2.0"
+    assert data["version"] == "3.3.0"
 
 
 def test_doctor_and_audit_endpoints():
@@ -36,6 +36,7 @@ def test_doctor_and_audit_endpoints():
 
 def test_ocr_endpoint():
     import io
+
     from PIL import Image
 
     # Create synthetic test image
@@ -82,4 +83,6 @@ if __name__ == "__main__":
     test_doctor_and_audit_endpoints()
     test_ocr_endpoint()
     test_sample_files_extraction()
-    print("[PASS] All sample file API extractions, OCR, doctor & audit endpoints verified via TestClient!")
+    print(
+        "[PASS] All sample file API extractions, OCR, doctor & audit endpoints verified via TestClient!"
+    )
