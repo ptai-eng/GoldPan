@@ -276,4 +276,4 @@ npm run dev
 
 ## 📜 License
 
-Released under the [MIT License](LICENSE). Crafted with passion by **[Hoang Kim Phat Tai (ptai-eng)](https://github.com/ptai-eng)**.
+Released under the [MIT License](LICENSE).
